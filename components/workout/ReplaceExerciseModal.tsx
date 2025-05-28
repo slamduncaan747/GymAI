@@ -78,7 +78,7 @@ const ReplaceExerciseModal: React.FC<ReplaceExerciseModalProps> = ({
     'full_body',
   ];
 
-  const renderExercise = ({item}: {item: Exercise}) => (
+  const renderExercise = ({item, index}: {item: Exercise; index: number}) => (
     <TouchableOpacity
       style={styles.exerciseItem}
       onPress={() => handleSelectExercise(item)}>
@@ -118,7 +118,7 @@ const ReplaceExerciseModal: React.FC<ReplaceExerciseModalProps> = ({
           horizontal
           showsHorizontalScrollIndicator={false}
           data={categories}
-          keyExtractor={item => item}
+          keyExtractor={item => `category-${item}`}
           renderItem={({item}) => (
             <TouchableOpacity
               style={[
@@ -172,10 +172,14 @@ const ReplaceExerciseModal: React.FC<ReplaceExerciseModalProps> = ({
           <FlatList
             data={exercisesToShow}
             renderItem={renderExercise}
-            keyExtractor={item => item.id}
+            keyExtractor={(item, index) => `exercise-${item.id}-${index}`}
             ListHeaderComponent={renderHeader}
             style={styles.list}
             contentContainerStyle={styles.listContent}
+            removeClippedSubviews={true}
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={10}
           />
 
           <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
