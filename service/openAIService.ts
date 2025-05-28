@@ -21,15 +21,7 @@ interface AIGeneratedWorkout {
   workoutNotes?: string;
 }
 
-interface OpenAIResponse {
-  choices: Array<{
-    message: {
-      content: string;
-    };
-  }>;
-}
-
-export class OpenAIService {
+class OpenAIService {
   private apiKey: string;
   private apiUrl = 'https://api.openai.com/v1/chat/completions';
 
@@ -109,7 +101,7 @@ Respond with JSON in this exact format:
           Authorization: `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          model: 'gpt-4o', // Updated to current model
+          model: 'gpt-4-turbo-preview',
           messages: [
             {role: 'system', content: systemPrompt},
             {role: 'user', content: userPrompt},
@@ -121,39 +113,13 @@ Respond with JSON in this exact format:
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `OpenAI API error: ${response.status} ${response.statusText} - ${errorText}`,
-        );
+        throw new Error(`OpenAI API error: ${response.statusText}`);
       }
 
-      const data: OpenAIResponse = await response.json();
-
-      // Add validation for response structure
-      if (
-        !data.choices ||
-        !data.choices[0] ||
-        !data.choices[0].message ||
-        !data.choices[0].message.content
-      ) {
-        throw new Error('Invalid response structure from OpenAI API');
-      }
-
-      let aiWorkout: AIGeneratedWorkout;
-      try {
-        aiWorkout = JSON.parse(data.choices[0].message.content);
-      } catch (parseError) {
-        console.error(
-          'Failed to parse AI response:',
-          data.choices[0].message.content,
-        );
-        throw new Error('Invalid JSON response from OpenAI API');
-      }
-
-      // Validate AI response structure
-      if (!aiWorkout.exercises || !Array.isArray(aiWorkout.exercises)) {
-        throw new Error('Invalid workout structure in AI response');
-      }
+      const data = await response.json();
+      const aiWorkout: AIGeneratedWorkout = JSON.parse(
+        data.choices[0].message.content,
+      );
 
       // Convert AI response to WorkoutExercise format
       return this.convertToWorkoutExercises(aiWorkout, exercisesToUse);
@@ -174,36 +140,23 @@ Respond with JSON in this exact format:
   ): WorkoutExercise[] {
     return aiWorkout.exercises
       .map(aiExercise => {
-        // Validate AI exercise data
-        if (
-          !aiExercise.exerciseId ||
-          typeof aiExercise.sets !== 'number' ||
-          typeof aiExercise.reps !== 'number'
-        ) {
-          console.warn('Invalid exercise data from AI:', aiExercise);
-          return null;
-        }
-
         const exercise = availableExercises.find(
           ex => ex.id === aiExercise.exerciseId,
         );
-        if (!exercise) {
-          console.warn('Exercise not found:', aiExercise.exerciseId);
-          return null;
-        }
+        if (!exercise) return null;
 
         return {
           id: exercise.id,
           name: exercise.name,
           targetReps: aiExercise.reps,
-          sets: Array.from({length: Math.max(1, aiExercise.sets)}, () => ({
+          sets: Array.from({length: aiExercise.sets}, () => ({
             target: aiExercise.reps,
             actual: 0,
             weight: exercise.defaultWeight || 0,
             completed: false,
           })),
-          restTime: aiExercise.restSeconds || 60, // Default rest time if not provided
-        } as WorkoutExercise;
+          restTime: aiExercise.restSeconds,
+        };
       })
       .filter((ex): ex is WorkoutExercise => ex !== null);
   }
@@ -222,8 +175,6 @@ Respond with JSON in this exact format:
       const alternatives = availableExercises.filter(
         ex => ex.id !== currentExerciseId,
       );
-
-      if (alternatives.length === 0) return null;
 
       const prompt = `Given a ${currentExercise.name} (${
         currentExercise.category
@@ -244,25 +195,14 @@ Respond with just the exercise ID.`;
           Authorization: `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini', // More cost-effective for simple recommendations
+          model: 'gpt-3.5-turbo',
           messages: [{role: 'user', content: prompt}],
           temperature: 0.5,
           max_tokens: 50,
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(
-          `OpenAI API error: ${response.status} ${response.statusText}`,
-        );
-      }
-
-      const data: OpenAIResponse = await response.json();
-
-      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-        throw new Error('Invalid response structure from OpenAI API');
-      }
-
+      const data = await response.json();
       const suggestedId = data.choices[0].message.content.trim();
 
       return alternatives.find(ex => ex.id === suggestedId) || null;
