@@ -106,8 +106,10 @@ export default function HomeScreen() {
                 {getMotivationalMessage()}
               </Text>
             </View>
-            <TouchableOpacity style={styles.profileButton}>
-              <Text style={styles.profileIcon}>👤</Text>
+            <TouchableOpacity
+              style={styles.profileButton}
+              onPress={() => navigation.navigate('Settings' as any)}>
+              <Text style={styles.profileIcon}>⚙️</Text>
             </TouchableOpacity>
           </View>
 
@@ -133,8 +135,10 @@ export default function HomeScreen() {
           style={styles.mainCTAButton}
           onPress={handleStartWorkout}
           activeOpacity={0.9}>
-          <Text style={styles.ctaText}>START AI WORKOUT</Text>
-          <Text style={styles.ctaSubtext}>Personalized for you</Text>
+          <View style={styles.ctaGradient}>
+            <Text style={styles.ctaText}>START AI WORKOUT</Text>
+            <Text style={styles.ctaSubtext}>Personalized for you</Text>
+          </View>
         </TouchableOpacity>
 
         {/* Quick Start Options */}
@@ -240,15 +244,18 @@ const styles = StyleSheet.create({
     marginTop: -10,
     marginBottom: 20,
     borderRadius: 16,
-    backgroundColor: colors.accent,
-    paddingVertical: 20,
-    paddingHorizontal: 24,
-    alignItems: 'center',
+    overflow: 'hidden',
     elevation: 8,
     shadowColor: colors.accent,
     shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.3,
     shadowRadius: 8,
+  },
+  ctaGradient: {
+    backgroundColor: colors.accent,
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    alignItems: 'center',
   },
   ctaText: {
     color: colors.buttonText,

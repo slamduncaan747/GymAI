@@ -1,3 +1,5 @@
+// App.tsx
+
 import React from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
@@ -10,8 +12,15 @@ import ExercisePreviewScreen from './components/workout/ExercisePreviewScreen';
 export type RootStackParamList = {
   Home: undefined;
   WorkoutSelect: undefined;
-  Workout: {duration: number};
-  ExercisePreview: {exerciseName: string; exerciseId: string};
+  Workout: {
+    duration: number;
+    focusAreas?: string[];
+    useAI?: boolean;
+  };
+  ExercisePreview: {
+    exerciseName: string;
+    exerciseId: string;
+  };
 };
 
 const Stack = createStackNavigator<RootStackParamList>();

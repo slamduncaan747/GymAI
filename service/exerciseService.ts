@@ -1,14 +1,10 @@
-import { Exercise, UserPreferences, WorkoutExercise } from '../types/workout';
-import { EXERCISE_DATABASE } from '../data/exerciseDatabase';
-import { OpenAIService } from './openAIService'; // Import OpenAIService
+// services/exerciseService.ts
+
+import {Exercise, UserPreferences, WorkoutExercise} from '../types/workout';
+import {EXERCISE_DATABASE} from '../data/exerciseDatabase';
 
 class ExerciseService {
   private exercises: Exercise[] = EXERCISE_DATABASE;
-  private openAIService?: OpenAIService; // Optional OpenAIService instance
-
-  constructor(openAIService?: OpenAIService) {
-    this.openAIService = openAIService; // Inject OpenAIService if provided
-  }
 
   // Get all exercises
   getAllExercises(): Exercise[] {
@@ -91,46 +87,13 @@ class ExerciseService {
   }
 
   // Get related exercises (same muscle group or movement pattern)
-  async getRelatedExercises(
-    exerciseId: string,
-    limit: number = 5,
-    recentExerciseIds?: string[], // Added to avoid recent exercises
-  ): Promise<Exercise[]> {
-    if (this.openAIService) {
-      // Try AI-based recommendation first
-      const recommendation = await this.openAIService.getExerciseRecommendation(
-        exerciseId,
-        { experienceLevel: 'intermediate', availableEquipment: ['bodyweight', 'dumbbell', 'barbell'], goals: ['general fitness'] } // Default preferences, adjust as needed
-      );
-      if (recommendation) {
-        // Get additional related exercises if needed to meet the limit
-        const remainingLimit = limit - 1;
-        const fallbackExercises = await this.getFallbackRelatedExercises(
-          exerciseId,
-          remainingLimit,
-          recentExerciseIds,
-        );
-        return [recommendation, ...fallbackExercises.filter(ex => ex.id !== recommendation.id)].slice(0, limit);
-      }
-    }
-
-    // Fallback to original logic
-    return this.getFallbackRelatedExercises(exerciseId, limit, recentExerciseIds);
-  }
-
-  // Helper method for fallback related exercises logic
-  private getFallbackRelatedExercises(
-    exerciseId: string,
-    limit: number,
-    recentExerciseIds?: string[],
-  ): Exercise[] {
+  getRelatedExercises(exerciseId: string, limit: number = 5): Exercise[] {
     const exercise = this.getExerciseById(exerciseId);
     if (!exercise) return [];
 
     return this.exercises
       .filter(ex => {
         if (ex.id === exerciseId) return false;
-        if (recentExerciseIds?.includes(ex.id)) return false; // Exclude recent exercises
 
         // Check for same primary muscle groups
         const sameMuscle = ex.muscleGroups.primary.some(muscle =>
@@ -192,21 +155,7 @@ class ExerciseService {
   }
 
   // Generate a balanced workout
-50% chance
-      return await this.openAIService.generateWorkout({
-        duration,
-        preferences,
-        focusAreas,
-        recentExerciseIds, // Pass recent exercises to avoid repetition
-      });
-    }
-
-    // Fallback to original logic
-    return this.generateFallbackWorkout(duration, preferences, focusAreas);
-  }
-
-  // Helper method for fallback workout generation
-  private generateFallbackWorkout(
+  generateWorkout(
     duration: number,
     preferences: UserPreferences,
     focusAreas?: Exercise['category'][],
@@ -324,7 +273,3 @@ class ExerciseService {
 
 // Export singleton instance
 export const exerciseService = new ExerciseService();
-
-// Export a function to create ExerciseService with OpenAIService
-export const createExerciseServiceWithAI = (openAIService: OpenAIService) =>
-  new ExerciseService(openAIService);

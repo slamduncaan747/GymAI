@@ -10,17 +10,6 @@ interface WorkoutGenerationParams {
   recentExerciseIds?: string[];
 }
 
-interface AIGeneratedWorkout {
-  exercises: Array<{
-    exerciseId: string;
-    sets: number;
-    reps: number;
-    restSeconds: number;
-    notes?: string;
-  }>;
-  workoutNotes?: string;
-}
-
 class OpenAIService {
   private apiKey: string;
   private apiUrl = 'https://api.openai.com/v1/chat/completions';
@@ -33,16 +22,30 @@ class OpenAIService {
     params: WorkoutGenerationParams,
   ): Promise<WorkoutExercise[]> {
     try {
+      // Get available exercises for the user
       const availableExercises = exerciseService.getExercisesForUser(
         params.preferences,
       );
 
       // Filter out recent exercises if provided
-      const exercisesToUse = params.recentExerciseIds
-        ? availableExercises.filter(
-            ex => !params.recentExerciseIds!.includes(ex.id),
-          )
-        : availableExercises;
+      let exercisesToUse = availableExercises;
+      if (params.recentExerciseIds && params.recentExerciseIds.length > 0) {
+        exercisesToUse = availableExercises.filter(
+          ex => !params.recentExerciseIds!.includes(ex.id),
+        );
+
+        // If we filtered out too many, add some back
+        if (exercisesToUse.length < 10) {
+          exercisesToUse = availableExercises;
+        }
+      }
+
+      // Calculate target exercise count
+      const exerciseTimeEstimate = 5; // minutes per exercise on average
+      const targetExerciseCount = Math.max(
+        3,
+        Math.min(12, Math.floor(params.duration / exerciseTimeEstimate)),
+      );
 
       // Create a simplified exercise list for the AI
       const exerciseList = exercisesToUse.map(ex => ({
@@ -50,48 +53,35 @@ class OpenAIService {
         name: ex.name,
         category: ex.category,
         equipment: ex.equipment,
-        primaryMuscles: ex.muscleGroups.primary,
+        primaryMuscles: ex.muscleGroups.primary.join(', '),
         difficulty: ex.difficulty,
         movement: ex.movement,
+        defaultSets: ex.defaultSets,
+        defaultReps: ex.defaultReps,
+        defaultRest: ex.defaultRestSeconds,
       }));
 
-      const systemPrompt = `You are an expert personal trainer creating workouts. 
-You must respond with ONLY valid JSON matching the specified format.
-Available exercises are provided in the exercise list.
-Consider the user's experience level, available equipment, and workout duration.
-Create balanced workouts with proper exercise order (compound before isolation).
-Ensure proper rest times based on exercise intensity.`;
+      const systemPrompt = `You are an expert personal trainer. Create a workout by selecting exercises from the provided list.
+Return a JSON array of exercise IDs in the order they should be performed.
+Consider: compound exercises before isolation, proper muscle group balance, and the user's experience level.
+Select exactly ${targetExerciseCount} exercises.`;
 
-      const userPrompt = `Create a ${params.duration}-minute workout for a ${
-        params.preferences.experienceLevel
-      } level person.
+      const userPrompt = `Create a ${params.duration}-minute workout.
+User level: ${params.preferences.experienceLevel}
 Goals: ${params.preferences.goals.join(', ')}
 ${
   params.focusAreas
-    ? `Focus areas: ${params.focusAreas.join(', ')}`
+    ? `Focus on: ${params.focusAreas.join(', ')}`
     : 'Create a balanced workout'
-}
-${
-  params.preferences.avoidMuscleGroups?.length
-    ? `Avoid: ${params.preferences.avoidMuscleGroups.join(', ')}`
-    : ''
 }
 
 Available exercises:
 ${JSON.stringify(exerciseList, null, 2)}
 
-Respond with JSON in this exact format:
+Return ONLY a JSON object like this:
 {
-  "exercises": [
-    {
-      "exerciseId": "exercise_id_from_list",
-      "sets": 3,
-      "reps": 10,
-      "restSeconds": 90,
-      "notes": "Optional coaching tip"
-    }
-  ],
-  "workoutNotes": "Optional workout overview"
+  "exerciseIds": ["exercise_id_1", "exercise_id_2", ...],
+  "notes": "Brief workout description"
 }`;
 
       const response = await fetch(this.apiUrl, {
@@ -101,28 +91,63 @@ Respond with JSON in this exact format:
           Authorization: `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          model: 'gpt-4-turbo-preview',
+          model: 'gpt-3.5-turbo',
           messages: [
             {role: 'system', content: systemPrompt},
             {role: 'user', content: userPrompt},
           ],
-          response_format: {type: 'json_object'},
           temperature: 0.7,
-          max_tokens: 1000,
+          max_tokens: 500,
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.statusText}`);
+        const error = await response.text();
+        console.error('OpenAI API error:', error);
+        throw new Error(`OpenAI API error: ${response.status}`);
       }
 
       const data = await response.json();
-      const aiWorkout: AIGeneratedWorkout = JSON.parse(
-        data.choices[0].message.content,
-      );
+
+      if (!data.choices || !data.choices[0]) {
+        throw new Error('Invalid response from OpenAI');
+      }
+
+      const content = data.choices[0].message.content;
+      let aiResponse;
+
+      try {
+        aiResponse = JSON.parse(content);
+      } catch (e) {
+        console.error('Failed to parse AI response:', content);
+        throw new Error('Invalid JSON response from AI');
+      }
 
       // Convert AI response to WorkoutExercise format
-      return this.convertToWorkoutExercises(aiWorkout, exercisesToUse);
+      const workoutExercises: WorkoutExercise[] = [];
+
+      if (aiResponse.exerciseIds && Array.isArray(aiResponse.exerciseIds)) {
+        for (const exerciseId of aiResponse.exerciseIds) {
+          const exercise = exercisesToUse.find(ex => ex.id === exerciseId);
+          if (exercise) {
+            workoutExercises.push(exerciseService.toWorkoutExercise(exercise));
+          }
+        }
+      }
+
+      // If we didn't get enough exercises, fall back to standard generation
+      if (workoutExercises.length < 3) {
+        console.log(
+          'AI generated too few exercises, falling back to standard generation',
+        );
+        return exerciseService.generateWorkout(
+          params.duration,
+          params.preferences,
+          params.focusAreas,
+        );
+      }
+
+      return workoutExercises;
     } catch (error) {
       console.error('Error generating AI workout:', error);
       // Fallback to standard generation
@@ -132,33 +157,6 @@ Respond with JSON in this exact format:
         params.focusAreas,
       );
     }
-  }
-
-  private convertToWorkoutExercises(
-    aiWorkout: AIGeneratedWorkout,
-    availableExercises: Exercise[],
-  ): WorkoutExercise[] {
-    return aiWorkout.exercises
-      .map(aiExercise => {
-        const exercise = availableExercises.find(
-          ex => ex.id === aiExercise.exerciseId,
-        );
-        if (!exercise) return null;
-
-        return {
-          id: exercise.id,
-          name: exercise.name,
-          targetReps: aiExercise.reps,
-          sets: Array.from({length: aiExercise.sets}, () => ({
-            target: aiExercise.reps,
-            actual: 0,
-            weight: exercise.defaultWeight || 0,
-            completed: false,
-          })),
-          restTime: aiExercise.restSeconds,
-        };
-      })
-      .filter((ex): ex is WorkoutExercise => ex !== null);
   }
 
   async getExerciseRecommendation(
@@ -172,40 +170,29 @@ Respond with JSON in this exact format:
 
       const availableExercises =
         exerciseService.getExercisesForUser(preferences);
-      const alternatives = availableExercises.filter(
-        ex => ex.id !== currentExerciseId,
+      const relatedExercises = exerciseService.getRelatedExercises(
+        currentExerciseId,
+        10,
       );
 
-      const prompt = `Given a ${currentExercise.name} (${
-        currentExercise.category
-      }, ${currentExercise.equipment}), 
-suggest the best alternative from this list for a ${
-        preferences.experienceLevel
-      } user:
-${JSON.stringify(
-  alternatives.map(ex => ({id: ex.id, name: ex.name, equipment: ex.equipment})),
-)}
+      // If we have good related exercises, just use the first one
+      if (relatedExercises.length > 0) {
+        return relatedExercises[0];
+      }
 
-Respond with just the exercise ID.`;
+      // Otherwise, find a suitable alternative
+      const alternatives = availableExercises.filter(
+        ex =>
+          ex.id !== currentExerciseId &&
+          ex.category === currentExercise.category,
+      );
 
-      const response = await fetch(this.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [{role: 'user', content: prompt}],
-          temperature: 0.5,
-          max_tokens: 50,
-        }),
-      });
+      if (alternatives.length > 0) {
+        // Return a random alternative
+        return alternatives[Math.floor(Math.random() * alternatives.length)];
+      }
 
-      const data = await response.json();
-      const suggestedId = data.choices[0].message.content.trim();
-
-      return alternatives.find(ex => ex.id === suggestedId) || null;
+      return null;
     } catch (error) {
       console.error('Error getting exercise recommendation:', error);
       return null;

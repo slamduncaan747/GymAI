@@ -1,3 +1,5 @@
+// screens/WorkoutScreen.tsx
+
 import React, {useEffect, useState} from 'react';
 import {
   View,
@@ -6,6 +8,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import {useNavigation, useRoute, RouteProp} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
@@ -20,11 +23,19 @@ import ReplaceExerciseModal from '../components/workout/ReplaceExerciseModal';
 import {colors} from '../themes/colors';
 import {WorkoutExercise} from '../types/workout';
 
+// Update route params to include new options
+type WorkoutScreenRouteProp = RouteProp<RootStackParamList, 'Workout'> & {
+  params: {
+    duration: number;
+    focusAreas?: string[];
+    useAI?: boolean;
+  };
+};
+
 type WorkoutScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
   'Workout'
 >;
-type WorkoutScreenRouteProp = RouteProp<RootStackParamList, 'Workout'>;
 
 interface ActiveTimer {
   exerciseIndex: number;
@@ -34,7 +45,7 @@ interface ActiveTimer {
 export default function WorkoutScreen() {
   const navigation = useNavigation<WorkoutScreenNavigationProp>();
   const route = useRoute<WorkoutScreenRouteProp>();
-  const {duration} = route.params;
+  const {duration, focusAreas, useAI = false} = route.params;
   const {
     currentWorkout,
     startWorkout,
@@ -45,6 +56,9 @@ export default function WorkoutScreen() {
     replaceExercise,
   } = useWorkout();
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadingMessage, setLoadingMessage] = useState<string>(
+    'Generating your workout...',
+  );
   const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null);
   const [timerUpdated, setTimerUpdated] = useState<boolean>(true);
   const [showReorderModal, setShowReorderModal] = useState<boolean>(false);
@@ -58,10 +72,43 @@ export default function WorkoutScreen() {
       setIsLoading(false);
       return;
     }
-    const exercises = generateWorkout(duration);
-    startWorkout(duration, exercises);
-    setIsLoading(false);
-  }, [currentWorkout, duration, startWorkout]);
+
+    generateWorkoutAsync();
+  }, [currentWorkout, duration, focusAreas, useAI]);
+
+  const generateWorkoutAsync = async () => {
+    try {
+      setIsLoading(true);
+      if (useAI) {
+        setLoadingMessage('AI is crafting your personalized workout...');
+      }
+
+      // Generate exercises
+      const exercises = await generateWorkout(
+        duration,
+        undefined, // TODO: Add user preferences
+        focusAreas as any,
+        useAI,
+      );
+
+      // Make sure we have exercises
+      if (!exercises || exercises.length === 0) {
+        throw new Error('No exercises generated');
+      }
+
+      // Start the workout
+      startWorkout(duration, exercises);
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error generating workout:', error);
+      setIsLoading(false);
+      Alert.alert(
+        'Generation Failed',
+        'Failed to generate workout. Please try again.',
+        [{text: 'OK', onPress: () => navigation.goBack()}],
+      );
+    }
+  };
 
   const handleTimerFinished = () => {
     setActiveTimer(null);
@@ -159,8 +206,14 @@ export default function WorkoutScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>Generating your workout...</Text>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.accent} />
+        <Text style={styles.loadingText}>{loadingMessage}</Text>
+        {useAI && (
+          <Text style={styles.loadingSubtext}>
+            This may take a few seconds...
+          </Text>
+        )}
       </View>
     );
   }
@@ -168,9 +221,14 @@ export default function WorkoutScreen() {
   if (!currentWorkout) {
     return (
       <View style={styles.container}>
-        <Text style={styles.loadingText}>
+        <Text style={styles.errorText}>
           Failed to load workout. Please try again.
         </Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => navigation.goBack()}>
+          <Text style={styles.retryButtonText}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -184,7 +242,7 @@ export default function WorkoutScreen() {
         showsVerticalScrollIndicator={false}>
         {currentWorkout.exercises.map((exercise, index) => (
           <ExerciseCard
-            key={exercise.id}
+            key={`${exercise.id}-${index}`} // Fix for duplicate key error
             exercise={exercise}
             exerciseIndex={index}
             onUpdate={(setIndex, actual, weight, completed, restTime) =>
@@ -250,11 +308,43 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
   loadingText: {
-    color: colors.loading,
+    color: colors.textPrimary,
     fontSize: 18,
+    marginTop: 20,
+    textAlign: 'center',
+  },
+  loadingSubtext: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  errorText: {
+    color: colors.textSecondary,
+    fontSize: 16,
     textAlign: 'center',
     marginTop: 50,
+    paddingHorizontal: 20,
+  },
+  retryButton: {
+    backgroundColor: colors.accent,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  retryButtonText: {
+    color: colors.buttonText,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   scrollView: {
     flex: 1,

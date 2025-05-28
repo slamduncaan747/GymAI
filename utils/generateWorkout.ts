@@ -2,6 +2,9 @@
 
 import {WorkoutExercise, UserPreferences, Exercise} from '../types/workout';
 import {exerciseService} from '../service/exerciseService';
+import {createOpenAIService} from '../service/openAIService';
+import {OPENAI_API_KEY} from '../config/config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Default user preferences if none are set
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -11,15 +14,58 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   avoidMuscleGroups: [],
 };
 
-export function generateWorkout(
+export async function generateWorkout(
   duration: number,
   userPreferences?: UserPreferences,
   focusAreas?: Exercise['category'][],
-): WorkoutExercise[] {
+  useAI: boolean = false,
+): Promise<WorkoutExercise[]> {
   const preferences = userPreferences || DEFAULT_PREFERENCES;
 
-  // Generate workout using the exercise service
+  // If AI is requested and we have an API key, use AI generation
+  if (useAI && OPENAI_API_KEY) {
+    try {
+      const openAIService = createOpenAIService(OPENAI_API_KEY);
+      const aiWorkout = await openAIService.generateWorkout({
+        duration,
+        preferences,
+        focusAreas,
+        recentExerciseIds: await getRecentExerciseIds(),
+      });
+
+      if (aiWorkout.length > 0) {
+        return aiWorkout;
+      }
+    } catch (error) {
+      console.error('AI generation failed, falling back to standard:', error);
+    }
+  }
+
+  // Always fall back to standard generation
   return exerciseService.generateWorkout(duration, preferences, focusAreas);
+}
+
+// Get recently used exercise IDs to avoid repetition
+async function getRecentExerciseIds(): Promise<string[]> {
+  try {
+    const savedWorkoutsStr = await AsyncStorage.getItem('savedWorkouts');
+    if (!savedWorkoutsStr) return [];
+
+    const workouts = JSON.parse(savedWorkoutsStr);
+    const recentWorkouts = workouts.slice(0, 3); // Last 3 workouts
+
+    const exerciseIds = new Set<string>();
+    recentWorkouts.forEach((workout: any) => {
+      workout.exercises.forEach((exercise: any) => {
+        exerciseIds.add(exercise.id);
+      });
+    });
+
+    return Array.from(exerciseIds);
+  } catch (error) {
+    console.error('Error getting recent exercises:', error);
+    return [];
+  }
 }
 
 // Generate a quick workout with specific equipment
@@ -47,17 +93,17 @@ export function generateTargetedWorkout(
 }
 
 // Generate a workout based on user's recent activity to ensure variety
-export function generateVariedWorkout(
+export async function generateVariedWorkout(
   duration: number,
-  recentExerciseIds: string[],
   userPreferences?: UserPreferences,
-): WorkoutExercise[] {
+): Promise<WorkoutExercise[]> {
   const preferences = userPreferences || DEFAULT_PREFERENCES;
+  const recentExerciseIds = await getRecentExerciseIds();
 
   // Get all suitable exercises
   const suitableExercises = exerciseService.getExercisesForUser(preferences);
 
-  // Filter out recently used exercises (within last 2 workouts)
+  // Filter out recently used exercises
   const freshExercises = suitableExercises.filter(
     ex => !recentExerciseIds.includes(ex.id),
   );
