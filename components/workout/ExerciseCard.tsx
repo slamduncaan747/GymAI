@@ -5,14 +5,13 @@ import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../../App';
 import {WorkoutExercise, WorkoutSet} from '../../types/workout';
 import {useWorkout} from '../../context/WorkoutContext';
-import SwipeableSetRow from './SwipeableSetRow';
+import SwipeableSetRow from './SwipableSetRow';
 import RestTimeModal from './RestTimeModal';
 import ExerciseOptionsModal from './ExerciseOptionsModal';
 import {colors} from '../../themes/colors';
 
 type ExerciseCardNavigationProp = StackNavigationProp<RootStackParamList>;
 
-// Define interfaces for props and types
 interface ExerciseCardProps {
   exercise: WorkoutExercise;
   exerciseIndex: number;
@@ -23,12 +22,27 @@ interface ExerciseCardProps {
     completed: boolean,
     restTime?: number,
   ) => void;
+  onReorderRequest?: () => void;
+  onReplaceRequest?: () => void;
+  onRemoveExercise?: (exerciseIndex: number) => void;
 }
 
 const ExerciseCard: React.FC<ExerciseCardProps> = React.memo(
-  ({exercise, exerciseIndex, onUpdate}) => {
+  ({
+    exercise,
+    exerciseIndex,
+    onUpdate,
+    onReorderRequest,
+    onReplaceRequest,
+    onRemoveExercise,
+  }) => {
     const navigation = useNavigation<ExerciseCardNavigationProp>();
-    const {updateExerciseSet, addSetToExercise, removeSetFromExercise} = useWorkout();
+    const {
+      updateExerciseSet,
+      addSetToExercise,
+      removeSetFromExercise,
+      updateExerciseRestTime,
+    } = useWorkout();
     const [showRestModal, setShowRestModal] = useState<boolean>(false);
     const [showOptionsModal, setShowOptionsModal] = useState<boolean>(false);
     const [restTime, setRestTime] = useState<number>(exercise.restTime || 60);
@@ -41,8 +55,13 @@ const ExerciseCard: React.FC<ExerciseCardProps> = React.memo(
     ): void => {
       updateExerciseSet(exerciseIndex, setIndex, actual, weight, completed);
       if (onUpdate) {
-        // Pass the current exercise's rest time when a set is completed
-        onUpdate(setIndex, actual, weight, completed, completed ? restTime : undefined);
+        onUpdate(
+          setIndex,
+          actual,
+          weight,
+          completed,
+          completed ? restTime : undefined,
+        );
       }
     };
 
@@ -55,11 +74,8 @@ const ExerciseCard: React.FC<ExerciseCardProps> = React.memo(
         weight: lastSet?.weight || 0,
         completed: false,
       };
-      
-      // Add the new set to the exercise
-      if (addSetToExercise) {
-        addSetToExercise(exerciseIndex, newSet);
-      }
+
+      addSetToExercise(exerciseIndex, newSet);
     };
 
     const formatRestTime = (seconds: number): string => {
@@ -75,7 +91,7 @@ const ExerciseCard: React.FC<ExerciseCardProps> = React.memo(
     };
 
     const handleSetDelete = (setIndex: number): void => {
-      if (exercise.sets.length > 1 && removeSetFromExercise) {
+      if (exercise.sets.length > 1) {
         removeSetFromExercise(exerciseIndex, setIndex);
       }
     };
@@ -88,28 +104,35 @@ const ExerciseCard: React.FC<ExerciseCardProps> = React.memo(
     };
 
     const handleReorderExercises = (): void => {
-      // Placeholder for reorder functionality
-      console.log('Reorder exercises');
+      if (onReorderRequest) {
+        onReorderRequest();
+      }
     };
 
     const handleReplaceExercise = (): void => {
-      // Placeholder for replace functionality
-      console.log('Replace exercise');
+      if (onReplaceRequest) {
+        onReplaceRequest();
+      }
     };
 
     const handleRemoveExercise = (): void => {
-      // Placeholder for remove functionality
-      console.log('Remove exercise');
-    }; could add a separate method to update exercise properties
-        // For now, the rest time is managed locally in this component
+      if (onRemoveExercise) {
+        onRemoveExercise(exerciseIndex);
       }
+    };
+
+    const handleRestTimeChange = (time: number): void => {
+      setRestTime(time);
+      updateExerciseRestTime(exerciseIndex, time);
     };
 
     return (
       <View style={styles.card}>
         <View style={styles.exerciseHeader}>
           <View style={styles.exerciseInfo}>
-            <Text style={styles.exerciseName}>{exercise.name}</Text>
+            <TouchableOpacity onPress={handleExerciseNamePress}>
+              <Text style={styles.exerciseName}>{exercise.name}</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.restTimeButton}
               onPress={() => setShowRestModal(true)}>
@@ -118,7 +141,9 @@ const ExerciseCard: React.FC<ExerciseCardProps> = React.memo(
               </Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.menuButton}>
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => setShowOptionsModal(true)}>
             <Text style={styles.menuText}>⋯</Text>
           </TouchableOpacity>
         </View>
@@ -140,24 +165,17 @@ const ExerciseCard: React.FC<ExerciseCardProps> = React.memo(
           </View>
 
           {exercise.sets.map((set: WorkoutSet, index: number) => (
-            <SetInputRow
+            <SwipeableSetRow
               key={index}
               setNumber={index + 1}
               set={set}
-              onUpdate={(
-                actual: number,
-                weight: number,
-                completed: boolean,
-              ) =>
-                handleSetUpdate(
-                  index,
-                  actual,
-                  weight,
-                  completed,
-                )
+              onUpdate={(actual: number, weight: number, completed: boolean) =>
+                handleSetUpdate(index, actual, weight, completed)
               }
+              onDelete={() => handleSetDelete(index)}
               previousSet={index > 0 ? exercise.sets[index - 1] : undefined}
               restTime={restTime}
+              canDelete={exercise.sets.length > 1}
             />
           ))}
 
@@ -172,6 +190,15 @@ const ExerciseCard: React.FC<ExerciseCardProps> = React.memo(
           currentTime={restTime}
           onTimeSelect={handleRestTimeChange}
           exerciseName={exercise.name}
+        />
+
+        <ExerciseOptionsModal
+          visible={showOptionsModal}
+          onClose={() => setShowOptionsModal(false)}
+          exerciseName={exercise.name}
+          onReorder={handleReorderExercises}
+          onReplace={handleReplaceExercise}
+          onRemove={handleRemoveExercise}
         />
       </View>
     );
@@ -206,6 +233,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: 6,
+    textDecorationLine: 'underline',
   },
   restTimeButton: {
     paddingVertical: 6,
@@ -214,6 +242,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.inputBackground,
     borderWidth: 1,
     borderColor: colors.inputBorder,
+    alignSelf: 'flex-start',
   },
   restTimeText: {
     fontSize: 14,

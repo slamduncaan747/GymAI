@@ -15,7 +15,10 @@ import {generateWorkout} from '../utils/generateWorkout';
 import ExerciseCard from '../components/workout/ExerciseCard';
 import WorkoutHeader from '../components/workout/WorkoutHeader';
 import TimerModal from '../components/workout/TimerModal';
+import ReorderExercisesModal from '../components/workout/ReorderExerciseModal';
+import ReplaceExerciseModal from '../components/workout/ReplaceExerciseModal';
 import {colors} from '../themes/colors';
+import {WorkoutExercise} from '../types/workout';
 
 type WorkoutScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -32,11 +35,23 @@ export default function WorkoutScreen() {
   const navigation = useNavigation<WorkoutScreenNavigationProp>();
   const route = useRoute<WorkoutScreenRouteProp>();
   const {duration} = route.params;
-  const {currentWorkout, startWorkout, completeWorkout, updateExerciseSet} =
-    useWorkout();
+  const {
+    currentWorkout,
+    startWorkout,
+    completeWorkout,
+    updateExerciseSet,
+    removeExercise,
+    reorderExercises,
+    replaceExercise,
+  } = useWorkout();
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null);
   const [timerUpdated, setTimerUpdated] = useState<boolean>(true);
+  const [showReorderModal, setShowReorderModal] = useState<boolean>(false);
+  const [showReplaceModal, setShowReplaceModal] = useState<boolean>(false);
+  const [exerciseToReplace, setExerciseToReplace] = useState<number | null>(
+    null,
+  );
 
   useEffect(() => {
     if (currentWorkout) {
@@ -91,6 +106,57 @@ export default function WorkoutScreen() {
     }
   };
 
+  const handleReorderRequest = () => {
+    setShowReorderModal(true);
+  };
+
+  const handleReplaceRequest = (exerciseIndex: number) => {
+    setExerciseToReplace(exerciseIndex);
+    setShowReplaceModal(true);
+  };
+
+  const handleRemoveExercise = (exerciseIndex: number) => {
+    if (!currentWorkout || currentWorkout.exercises.length <= 1) {
+      Alert.alert(
+        'Cannot Remove',
+        'You must have at least one exercise in your workout.',
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Remove Exercise',
+      `Are you sure you want to remove ${currentWorkout.exercises[exerciseIndex].name}?`,
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            if (removeExercise) {
+              removeExercise(exerciseIndex);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleReorderComplete = (newOrder: WorkoutExercise[]) => {
+    if (reorderExercises) {
+      reorderExercises(newOrder);
+    }
+    setShowReorderModal(false);
+  };
+
+  const handleReplaceComplete = (newExercise: WorkoutExercise) => {
+    if (exerciseToReplace !== null && replaceExercise) {
+      replaceExercise(exerciseToReplace, newExercise);
+    }
+    setShowReplaceModal(false);
+    setExerciseToReplace(null);
+  };
+
   if (isLoading) {
     return (
       <View style={styles.container}>
@@ -112,14 +178,7 @@ export default function WorkoutScreen() {
   return (
     <View style={styles.container}>
       <WorkoutHeader />
-      <Text style={{color: '#ffffff'}}>
-        Timer:{' '}
-        {activeTimer
-          ? `Active (${
-              currentWorkout.exercises[activeTimer.exerciseIndex]?.name
-            })`
-          : 'Inactive'}
-      </Text>
+
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}>
@@ -138,6 +197,9 @@ export default function WorkoutScreen() {
                 restTime,
               )
             }
+            onReorderRequest={handleReorderRequest}
+            onReplaceRequest={() => handleReplaceRequest(index)}
+            onRemoveExercise={handleRemoveExercise}
           />
         ))}
         <TouchableOpacity
@@ -146,6 +208,7 @@ export default function WorkoutScreen() {
           <Text style={styles.completeButtonText}>COMPLETE WORKOUT</Text>
         </TouchableOpacity>
       </ScrollView>
+
       <TimerModal
         visible={!!activeTimer}
         onDismiss={handleTimerFinished}
@@ -153,6 +216,31 @@ export default function WorkoutScreen() {
         timerUpdated={timerUpdated}
         setTimerUpdated={setTimerUpdated}
       />
+
+      {showReorderModal && currentWorkout && (
+        <ReorderExercisesModal
+          visible={showReorderModal}
+          exercises={currentWorkout.exercises}
+          onClose={() => setShowReorderModal(false)}
+          onReorder={handleReorderComplete}
+        />
+      )}
+
+      {showReplaceModal && (
+        <ReplaceExerciseModal
+          visible={showReplaceModal}
+          onClose={() => {
+            setShowReplaceModal(false);
+            setExerciseToReplace(null);
+          }}
+          onReplace={handleReplaceComplete}
+          currentExerciseId={
+            exerciseToReplace !== null
+              ? currentWorkout.exercises[exerciseToReplace].id
+              : ''
+          }
+        />
+      )}
     </View>
   );
 }

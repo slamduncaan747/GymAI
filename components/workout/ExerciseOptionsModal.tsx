@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Modal,
   TouchableWithoutFeedback,
+  Dimensions,
 } from 'react-native';
 import {colors} from '../../themes/colors';
 
@@ -42,47 +43,52 @@ const ExerciseOptionsModal: React.FC<ExerciseOptionsModalProps> = ({
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
             <View style={styles.modalContainer}>
-              <View style={styles.header}>
-                <Text style={styles.title} numberOfLines={2}>
-                  {exerciseName}
-                </Text>
-              </View>
-
-              <View style={styles.optionsContainer}>
-                <TouchableOpacity
-                  style={styles.option}
-                  onPress={() => handleOptionPress(onReorder)}
-                  activeOpacity={0.7}>
-                  <Text style={styles.optionText}>🔄 Reorder Exercises</Text>
-                </TouchableOpacity>
-
-                <View style={styles.separator} />
-
-                <TouchableOpacity
-                  style={styles.option}
-                  onPress={() => handleOptionPress(onReplace)}
-                  activeOpacity={0.7}>
-                  <Text style={styles.optionText}>🔄 Replace Exercise</Text>
-                </TouchableOpacity>
-
-                <View style={styles.separator} />
-
-                <TouchableOpacity
-                  style={[styles.option, styles.dangerOption]}
-                  onPress={() => handleOptionPress(onRemove)}
-                  activeOpacity={0.7}>
-                  <Text style={[styles.optionText, styles.dangerText]}>
-                    🗑️ Remove Exercise
+              <View style={styles.modalContent}>
+                <View style={styles.header}>
+                  <Text style={styles.title} numberOfLines={2}>
+                    {exerciseName}
                   </Text>
+                </View>
+
+                <View style={styles.optionsContainer}>
+                  <TouchableOpacity
+                    style={styles.option}
+                    onPress={() => handleOptionPress(onReorder)}
+                    activeOpacity={0.7}>
+                    <Text style={styles.optionIcon}>↕️</Text>
+                    <Text style={styles.optionText}>Reorder Exercises</Text>
+                  </TouchableOpacity>
+
+                  <View style={styles.separator} />
+
+                  <TouchableOpacity
+                    style={styles.option}
+                    onPress={() => handleOptionPress(onReplace)}
+                    activeOpacity={0.7}>
+                    <Text style={styles.optionIcon}>🔄</Text>
+                    <Text style={styles.optionText}>Replace Exercise</Text>
+                  </TouchableOpacity>
+
+                  <View style={styles.separator} />
+
+                  <TouchableOpacity
+                    style={[styles.option, styles.dangerOption]}
+                    onPress={() => handleOptionPress(onRemove)}
+                    activeOpacity={0.7}>
+                    <Text style={styles.optionIcon}>🗑️</Text>
+                    <Text style={[styles.optionText, styles.dangerText]}>
+                      Remove Exercise
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={onClose}
+                  activeOpacity={0.7}>
+                  <Text style={styles.cancelText}>Cancel</Text>
                 </TouchableOpacity>
               </View>
-
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={onClose}
-                activeOpacity={0.7}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
             </View>
           </TouchableWithoutFeedback>
         </View>
@@ -95,20 +101,20 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
+    justifyContent: 'flex-end',
   },
   modalContainer: {
+    paddingHorizontal: 10,
+    paddingBottom: 34,
+  },
+  modalContent: {
     backgroundColor: colors.cardBackground,
     borderRadius: 16,
-    width: '100%',
-    maxWidth: 320,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOffset: {width: 0, height: -4},
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
     elevation: 8,
   },
   header: {
@@ -135,10 +141,16 @@ const styles = StyleSheet.create({
   dangerOption: {
     backgroundColor: 'rgba(255, 59, 48, 0.1)',
   },
+  optionIcon: {
+    fontSize: 20,
+    marginRight: 12,
+    width: 28,
+  },
   optionText: {
     fontSize: 16,
     fontWeight: '500',
     color: colors.textPrimary,
+    flex: 1,
   },
   dangerText: {
     color: '#FF3B30',

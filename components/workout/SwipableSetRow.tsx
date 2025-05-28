@@ -18,7 +18,7 @@ interface SwipeableSetRowProps {
   onDelete: () => void;
   previousSet?: WorkoutSet;
   restTime?: number;
-  canDelete?: boolean; // Don't allow deleting if it's the only set
+  canDelete?: boolean;
 }
 
 const SwipeableSetRow: React.FC<SwipeableSetRowProps> = ({
@@ -42,6 +42,7 @@ const SwipeableSetRow: React.FC<SwipeableSetRowProps> = ({
       );
     },
     onPanResponderGrant: () => {
+      // @ts-ignore - _value is a private property but we need it
       translateX.setOffset(translateX._value);
     },
     onPanResponderMove: (evt, gestureState) => {

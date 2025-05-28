@@ -11,7 +11,9 @@ import {useNavigation, useRoute, RouteProp} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../../App';
 import {colors} from '../../themes/colors';
-import {VictoryChart, VictoryLine} from 'victory-native';
+
+// Add this to your RootStackParamList in App.tsx
+// ExercisePreview: {exerciseName: string; exerciseId: string};
 
 type ExercisePreviewScreenNavigationProp = StackNavigationProp<
   RootStackParamList,

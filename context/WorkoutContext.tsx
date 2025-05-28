@@ -1,7 +1,6 @@
 import React, {createContext, useContext, useState, ReactNode} from 'react';
 import {Workout, WorkoutExercise, WorkoutSet} from '../types/workout';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {Alert} from 'react-native';
 
 interface WorkoutContextType {
   currentWorkout: Workout | null;
@@ -17,6 +16,12 @@ interface WorkoutContextType {
   addSetToExercise: (exerciseIndex: number, newSet: WorkoutSet) => void;
   removeSetFromExercise: (exerciseIndex: number, setIndex: number) => void;
   updateExerciseRestTime: (exerciseIndex: number, restTime: number) => void;
+  removeExercise: (exerciseIndex: number) => void;
+  reorderExercises: (newOrder: WorkoutExercise[]) => void;
+  replaceExercise: (
+    exerciseIndex: number,
+    newExercise: WorkoutExercise,
+  ) => void;
   completeWorkout: () => Promise<void>;
   loadSavedWorkouts: () => Promise<void>;
 }
@@ -47,7 +52,6 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
   ) => {
     if (!currentWorkout) return;
 
-    // Validate indices
     if (
       exerciseIndex < 0 ||
       exerciseIndex >= currentWorkout.exercises.length ||
@@ -71,7 +75,6 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
   const addSetToExercise = (exerciseIndex: number, newSet: WorkoutSet) => {
     if (!currentWorkout) return;
 
-    // Validate exercise index
     if (exerciseIndex < 0 || exerciseIndex >= currentWorkout.exercises.length) {
       console.error('Invalid exercise index');
       return;
@@ -85,7 +88,6 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
   const removeSetFromExercise = (exerciseIndex: number, setIndex: number) => {
     if (!currentWorkout) return;
 
-    // Validate indices
     if (
       exerciseIndex < 0 ||
       exerciseIndex >= currentWorkout.exercises.length ||
@@ -96,7 +98,6 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
       return;
     }
 
-    // Don't allow deleting the last set
     if (currentWorkout.exercises[exerciseIndex].sets.length <= 1) {
       console.warn('Cannot delete the last set');
       return;
@@ -106,9 +107,10 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
     updatedWorkout.exercises[exerciseIndex].sets.splice(setIndex, 1);
     setCurrentWorkout(updatedWorkout);
   };
+
+  const updateExerciseRestTime = (exerciseIndex: number, restTime: number) => {
     if (!currentWorkout) return;
 
-    // Validate exercise index
     if (exerciseIndex < 0 || exerciseIndex >= currentWorkout.exercises.length) {
       console.error('Invalid exercise index');
       return;
@@ -116,6 +118,47 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
 
     const updatedWorkout = {...currentWorkout};
     updatedWorkout.exercises[exerciseIndex].restTime = restTime;
+    setCurrentWorkout(updatedWorkout);
+  };
+
+  const removeExercise = (exerciseIndex: number) => {
+    if (!currentWorkout) return;
+
+    if (
+      exerciseIndex < 0 ||
+      exerciseIndex >= currentWorkout.exercises.length ||
+      currentWorkout.exercises.length <= 1
+    ) {
+      console.error('Invalid exercise index or cannot remove last exercise');
+      return;
+    }
+
+    const updatedWorkout = {...currentWorkout};
+    updatedWorkout.exercises.splice(exerciseIndex, 1);
+    setCurrentWorkout(updatedWorkout);
+  };
+
+  const reorderExercises = (newOrder: WorkoutExercise[]) => {
+    if (!currentWorkout) return;
+
+    const updatedWorkout = {...currentWorkout};
+    updatedWorkout.exercises = newOrder;
+    setCurrentWorkout(updatedWorkout);
+  };
+
+  const replaceExercise = (
+    exerciseIndex: number,
+    newExercise: WorkoutExercise,
+  ) => {
+    if (!currentWorkout) return;
+
+    if (exerciseIndex < 0 || exerciseIndex >= currentWorkout.exercises.length) {
+      console.error('Invalid exercise index');
+      return;
+    }
+
+    const updatedWorkout = {...currentWorkout};
+    updatedWorkout.exercises[exerciseIndex] = newExercise;
     setCurrentWorkout(updatedWorkout);
   };
 
@@ -161,6 +204,9 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
         addSetToExercise,
         removeSetFromExercise,
         updateExerciseRestTime,
+        removeExercise,
+        reorderExercises,
+        replaceExercise,
         completeWorkout,
         loadSavedWorkouts,
       }}>
