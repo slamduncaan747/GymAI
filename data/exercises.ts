@@ -1,94 +1,33 @@
+// data/exercises.ts
+// This file maintains backward compatibility with the old exercise structure
+// while using the new comprehensive database
+
+import {EXERCISE_DATABASE} from './exerciseDatabase';
 import {Exercise} from '../types/workout';
 
-export const EXERCISES: Exercise[] = [
-  {
-    id: 'bench-press',
-    name: 'Bench Press',
-    category: 'Chest',
-    defaultSets: 3,
-    defaultReps: 10,
-    defaultWeight: 135,
-    defaultRestTime: 90,
-  },
-  {
-    id: 'squat',
-    name: 'Squat',
-    category: 'Legs',
-    defaultSets: 3,
-    defaultReps: 10,
-    defaultWeight: 185,
-    defaultRestTime: 120,
-  },
-  {
-    id: 'deadlift',
-    name: 'Deadlift',
-    category: 'Back',
-    defaultSets: 3,
-    defaultReps: 8,
-    defaultWeight: 225,
-    defaultRestTime: 120,
-  },
-  {
-    id: 'overhead-press',
-    name: 'Overhead Press',
-    category: 'Shoulders',
-    defaultSets: 3,
-    defaultReps: 10,
-    defaultWeight: 95,
-    defaultRestTime: 90,
-  },
-  {
-    id: 'barbell-row',
-    name: 'Barbell Row',
-    category: 'Back',
-    defaultSets: 3,
-    defaultReps: 10,
-    defaultWeight: 135,
-    defaultRestTime: 90,
-  },
-  {
-    id: 'dumbbell-curl',
-    name: 'Dumbbell Curl',
-    category: 'Arms',
-    defaultSets: 3,
-    defaultReps: 12,
-    defaultWeight: 30,
-    defaultRestTime: 60,
-  },
-  {
-    id: 'tricep-extension',
-    name: 'Tricep Extension',
-    category: 'Arms',
-    defaultSets: 3,
-    defaultReps: 12,
-    defaultWeight: 25,
-    defaultRestTime: 60,
-  },
-  {
-    id: 'leg-press',
-    name: 'Leg Press',
-    category: 'Legs',
-    defaultSets: 3,
-    defaultReps: 12,
-    defaultWeight: 270,
-    defaultRestTime: 90,
-  },
-  {
-    id: 'lat-pulldown',
-    name: 'Lat Pulldown',
-    category: 'Back',
-    defaultSets: 3,
-    defaultReps: 12,
-    defaultWeight: 120,
-    defaultRestTime: 90,
-  },
-  {
-    id: 'chest-fly',
-    name: 'Chest Fly',
-    category: 'Chest',
-    defaultSets: 3,
-    defaultReps: 12,
-    defaultWeight: 25,
-    defaultRestTime: 60,
-  },
-];
+// Convert new Exercise format to old format for backward compatibility
+export const EXERCISES = EXERCISE_DATABASE.map(exercise => ({
+  id: exercise.id,
+  name: exercise.name,
+  category: exercise.category,
+  defaultSets: exercise.defaultSets,
+  defaultReps: exercise.defaultReps,
+  defaultWeight: exercise.defaultWeight || 0,
+  defaultRestTime: exercise.defaultRestSeconds,
+}));
+
+// Export the categories for UI components
+export const EXERCISE_CATEGORIES = [
+  'chest',
+  'back',
+  'shoulders',
+  'legs',
+  'arms',
+  'core',
+  'full_body',
+] as const;
+
+// Helper function to get exercises by category (backward compatible)
+export const getExercisesByCategory = (category: string) => {
+  return EXERCISES.filter(ex => ex.category === category);
+};

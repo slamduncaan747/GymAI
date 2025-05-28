@@ -1,3 +1,5 @@
+// components/workout/ExercisePreviewScreen.tsx
+
 import React, {useState, useEffect} from 'react';
 import {
   View,
@@ -5,15 +7,15 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
+  Alert,
 } from 'react-native';
 import {useNavigation, useRoute, RouteProp} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../../App';
 import {colors} from '../../themes/colors';
-
-// Add this to your RootStackParamList in App.tsx
-// ExercisePreview: {exerciseName: string; exerciseId: string};
+import {exerciseService} from '../../service/exerciseService';
+import {useWorkout} from '../../context/WorkoutContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type ExercisePreviewScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -24,213 +26,277 @@ type ExercisePreviewScreenRouteProp = RouteProp<
   'ExercisePreview'
 >;
 
-interface HistoryEntry {
+interface ExerciseHistory {
   date: string;
   sets: Array<{
     weight: number;
     reps: number;
-    volume: number;
   }>;
-  bestSet: {
-    weight: number;
-    reps: number;
-    volume: number;
-  };
-  totalVolume: number;
-}
-
-interface ProgressData {
-  date: string;
-  maxWeight: number;
-  totalVolume: number;
-  bestSet: number;
 }
 
 export default function ExercisePreviewScreen() {
   const navigation = useNavigation<ExercisePreviewScreenNavigationProp>();
   const route = useRoute<ExercisePreviewScreenRouteProp>();
   const {exerciseName, exerciseId} = route.params;
+  const {savedWorkouts} = useWorkout();
 
-  const [activeTab, setActiveTab] = useState<'info' | 'history' | 'progress'>(
+  const [activeTab, setActiveTab] = useState<'info' | 'history' | 'tips'>(
     'info',
   );
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [progressData, setProgressData] = useState<ProgressData[]>([]);
+  const [exerciseHistory, setExerciseHistory] = useState<ExerciseHistory[]>([]);
+  const [personalRecord, setPersonalRecord] = useState<{
+    weight: number;
+    reps: number;
+  } | null>(null);
 
-  const screenWidth = Dimensions.get('window').width;
+  const exercise = exerciseService.getExerciseById(exerciseId);
 
   useEffect(() => {
-    generateFakeData();
-  }, []);
-
-  const generateFakeData = () => {
-    // Generate fake history data
-    const historyData: HistoryEntry[] = [];
-    const progressData: ProgressData[] = [];
-
-    for (let i = 0; i < 10; i++) {
-      const date = new Date();
-      date.setDate(date.getDate() - i * 3);
-      const dateStr = date.toLocaleDateString();
-
-      const numSets = Math.floor(Math.random() * 3) + 2; // 2-4 sets
-      const sets = [];
-      let totalVolume = 0;
-      let maxWeight = 0;
-      let bestVolume = 0;
-
-      for (let j = 0; j < numSets; j++) {
-        const weight = Math.floor(Math.random() * 50) + 100 + i * 2; // Progressive weight
-        const reps = Math.floor(Math.random() * 5) + 6; // 6-10 reps
-        const volume = weight * reps;
-
-        sets.push({weight, reps, volume});
-        totalVolume += volume;
-        maxWeight = Math.max(maxWeight, weight);
-        bestVolume = Math.max(bestVolume, volume);
-      }
-
-      const bestSet = sets.find(s => s.volume === bestVolume) || sets[0];
-
-      historyData.push({
-        date: dateStr,
-        sets,
-        bestSet,
-        totalVolume,
-      });
-
-      progressData.push({
-        date: dateStr,
-        maxWeight,
-        totalVolume,
-        bestSet: bestVolume,
-      });
+    if (exercise) {
+      loadExerciseHistory();
     }
+  }, [exercise, savedWorkouts]);
 
-    setHistory(historyData.reverse());
-    setProgressData(progressData.reverse());
+  const loadExerciseHistory = () => {
+    const history: ExerciseHistory[] = [];
+    let maxWeight = 0;
+    let maxWeightReps = 0;
+
+    savedWorkouts.forEach(workout => {
+      const exerciseInWorkout = workout.exercises.find(
+        ex => ex.id === exerciseId,
+      );
+      if (exerciseInWorkout) {
+        const sets = exerciseInWorkout.sets
+          .filter(set => set.actual > 0)
+          .map(set => ({
+            weight: set.weight,
+            reps: set.actual,
+          }));
+
+        if (sets.length > 0) {
+          history.push({
+            date: new Date(workout.timestamp).toLocaleDateString(),
+            sets,
+          });
+
+          // Track personal record
+          sets.forEach(set => {
+            if (set.weight > maxWeight) {
+              maxWeight = set.weight;
+              maxWeightReps = set.reps;
+            }
+          });
+        }
+      }
+    });
+
+    setExerciseHistory(history.reverse()); // Most recent first
+    if (maxWeight > 0) {
+      setPersonalRecord({weight: maxWeight, reps: maxWeightReps});
+    }
   };
 
-  const getExerciseInfo = () => {
-    // Mock exercise information
-    return {
-      category: 'Chest',
-      equipment: 'Barbell',
-      muscles: ['Pectorals', 'Anterior Deltoids', 'Triceps'],
-      description:
-        "A compound upper body exercise that primarily targets the chest muscles. Lie on a bench and press the barbell from chest level to arm's length.",
-      instructions: [
-        'Lie flat on a bench with your feet on the floor',
-        'Grip the barbell with hands slightly wider than shoulder-width',
-        'Lower the bar to your chest with control',
-        'Press the bar back up to the starting position',
-        'Keep your core engaged throughout the movement',
-      ],
-    };
-  };
-
-  const exerciseInfo = getExerciseInfo();
+  if (!exercise) {
+    return (
+      <View style={styles.container}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}>
+          <Text style={styles.backButtonText}>←</Text>
+        </TouchableOpacity>
+        <Text style={styles.errorText}>Exercise not found</Text>
+      </View>
+    );
+  }
 
   const renderInfoTab = () => (
-    <View style={styles.tabContent}>
+    <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
+      {/* Exercise Details */}
       <View style={styles.infoSection}>
         <Text style={styles.sectionTitle}>Exercise Details</Text>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Category:</Text>
-          <Text style={styles.infoValue}>{exerciseInfo.category}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Equipment:</Text>
-          <Text style={styles.infoValue}>{exerciseInfo.equipment}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Primary Muscles:</Text>
-          <Text style={styles.infoValue}>
-            {exerciseInfo.muscles.join(', ')}
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Category:</Text>
+          <Text style={styles.detailValue}>
+            {exercise.category.charAt(0).toUpperCase() +
+              exercise.category.slice(1)}
           </Text>
         </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Equipment:</Text>
+          <Text style={styles.detailValue}>
+            {exercise.equipment.replace('_', ' ').charAt(0).toUpperCase() +
+              exercise.equipment.replace('_', ' ').slice(1)}
+          </Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Difficulty:</Text>
+          <Text
+            style={[
+              styles.detailValue,
+              styles[`difficulty${exercise.difficulty}`],
+            ]}>
+            {exercise.difficulty.charAt(0).toUpperCase() +
+              exercise.difficulty.slice(1)}
+          </Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Primary Muscles:</Text>
+          <Text style={styles.detailValue}>
+            {exercise.muscleGroups.primary
+              .map(
+                m =>
+                  m.replace('_', ' ').charAt(0).toUpperCase() +
+                  m.replace('_', ' ').slice(1),
+              )
+              .join(', ')}
+          </Text>
+        </View>
+        {exercise.muscleGroups.secondary.length > 0 && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Secondary Muscles:</Text>
+            <Text style={styles.detailValue}>
+              {exercise.muscleGroups.secondary
+                .map(
+                  m =>
+                    m.replace('_', ' ').charAt(0).toUpperCase() +
+                    m.replace('_', ' ').slice(1),
+                )
+                .join(', ')}
+            </Text>
+          </View>
+        )}
       </View>
 
+      {/* Instructions */}
       <View style={styles.infoSection}>
-        <Text style={styles.sectionTitle}>Description</Text>
-        <Text style={styles.description}>{exerciseInfo.description}</Text>
-      </View>
-
-      <View style={styles.infoSection}>
-        <Text style={styles.sectionTitle}>Instructions</Text>
-        {exerciseInfo.instructions.map((instruction, index) => (
+        <Text style={styles.sectionTitle}>How to Perform</Text>
+        {exercise.instructions.map((instruction, index) => (
           <View key={index} style={styles.instructionRow}>
             <Text style={styles.instructionNumber}>{index + 1}.</Text>
             <Text style={styles.instructionText}>{instruction}</Text>
           </View>
         ))}
       </View>
-    </View>
+
+      {/* Common Mistakes */}
+      <View style={styles.infoSection}>
+        <Text style={styles.sectionTitle}>Common Mistakes to Avoid</Text>
+        {exercise.commonMistakes.map((mistake, index) => (
+          <View key={index} style={styles.mistakeRow}>
+            <Text style={styles.bulletPoint}>•</Text>
+            <Text style={styles.mistakeText}>{mistake}</Text>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
   );
 
   const renderHistoryTab = () => (
-    <View style={styles.tabContent}>
-      {history.map((entry, index) => (
-        <View key={index} style={styles.historyEntry}>
-          <Text style={styles.historyDate}>{entry.date}</Text>
-          <View style={styles.historyStats}>
-            <Text style={styles.historyStat}>
-              Best Set: {entry.bestSet.weight}lbs × {entry.bestSet.reps}
-            </Text>
-            <Text style={styles.historyStat}>
-              Volume: {entry.totalVolume.toLocaleString()}lbs
-            </Text>
-          </View>
-          <View style={styles.setsContainer}>
-            {entry.sets.map((set, setIndex) => (
-              <View key={setIndex} style={styles.setRow}>
-                <Text style={styles.setNumber}>{setIndex + 1}</Text>
-                <Text style={styles.setData}>
-                  {set.weight}lbs × {set.reps}
-                </Text>
-                <Text style={styles.setVolume}>{set.volume}lbs</Text>
-              </View>
-            ))}
-          </View>
+    <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
+      {personalRecord && (
+        <View style={styles.prCard}>
+          <Text style={styles.prTitle}>Personal Record</Text>
+          <Text style={styles.prValue}>
+            {personalRecord.weight} lbs × {personalRecord.reps} reps
+          </Text>
         </View>
-      ))}
-    </View>
+      )}
+
+      {exerciseHistory.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>No history yet</Text>
+          <Text style={styles.emptySubtext}>
+            Complete this exercise in a workout to see your history
+          </Text>
+        </View>
+      ) : (
+        exerciseHistory.map((session, index) => (
+          <View key={index} style={styles.historyCard}>
+            <Text style={styles.historyDate}>{session.date}</Text>
+            <View style={styles.setsContainer}>
+              {session.sets.map((set, setIndex) => (
+                <View key={setIndex} style={styles.setRow}>
+                  <Text style={styles.setNumber}>Set {setIndex + 1}</Text>
+                  <Text style={styles.setData}>
+                    {set.weight} lbs × {set.reps} reps
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ))
+      )}
+    </ScrollView>
   );
 
-  const renderProgressTab = () => (
-    <View style={styles.tabContent}>
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>
-            {Math.max(...progressData.map(p => p.maxWeight))}lbs
-          </Text>
-          <Text style={styles.statLabel}>Max Weight</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>
-            {Math.max(...progressData.map(p => p.totalVolume)).toLocaleString()}
-          </Text>
-          <Text style={styles.statLabel}>Best Volume</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{history.length}</Text>
-          <Text style={styles.statLabel}>Sessions</Text>
+  const renderTipsTab = () => (
+    <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
+      {/* Pro Tips */}
+      <View style={styles.infoSection}>
+        <Text style={styles.sectionTitle}>Pro Tips</Text>
+        {exercise.tips.map((tip, index) => (
+          <View key={index} style={styles.tipRow}>
+            <Text style={styles.tipIcon}>💡</Text>
+            <Text style={styles.tipText}>{tip}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Default Programming */}
+      <View style={styles.infoSection}>
+        <Text style={styles.sectionTitle}>Suggested Programming</Text>
+        <View style={styles.programmingCard}>
+          <View style={styles.programmingRow}>
+            <Text style={styles.programmingLabel}>Sets:</Text>
+            <Text style={styles.programmingValue}>{exercise.defaultSets}</Text>
+          </View>
+          <View style={styles.programmingRow}>
+            <Text style={styles.programmingLabel}>Reps:</Text>
+            <Text style={styles.programmingValue}>{exercise.defaultReps}</Text>
+          </View>
+          <View style={styles.programmingRow}>
+            <Text style={styles.programmingLabel}>Rest:</Text>
+            <Text style={styles.programmingValue}>
+              {exercise.defaultRestSeconds}s
+            </Text>
+          </View>
+          {exercise.defaultWeight && (
+            <View style={styles.programmingRow}>
+              <Text style={styles.programmingLabel}>Starting Weight:</Text>
+              <Text style={styles.programmingValue}>
+                {exercise.defaultWeight} lbs
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
-      <Text style={styles.chartTitle}>Weight Progress</Text>
-      <View style={styles.chartContainer}>
-        <Text style={styles.chartPlaceholder}>
-          📈 Progress Chart
-          {'\n'}Max Weight Over Time
-          {'\n\n'}
-          {progressData
-            .slice(-5)
-            .map((data, index) => `${data.date}: ${data.maxWeight}lbs\n`)
-            .join('')}
-        </Text>
-      </View>
-    </View>
+      {/* Related Exercises */}
+      {exercise.variations && exercise.variations.length > 0 && (
+        <View style={styles.infoSection}>
+          <Text style={styles.sectionTitle}>Related Exercises</Text>
+          {exerciseService
+            .getRelatedExercises(exercise.id, 5)
+            .map((related, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.relatedExerciseRow}
+                onPress={() => {
+                  navigation.push('ExercisePreview', {
+                    exerciseName: related.name,
+                    exerciseId: related.id,
+                  });
+                }}>
+                <Text style={styles.relatedExerciseName}>{related.name}</Text>
+                <Text style={styles.relatedExerciseInfo}>
+                  {related.equipment} • {related.difficulty}
+                </Text>
+              </TouchableOpacity>
+            ))}
+        </View>
+      )}
+    </ScrollView>
   );
 
   return (
@@ -242,9 +308,16 @@ export default function ExercisePreviewScreen() {
           onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={2}>
-          {exerciseName}
-        </Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {exerciseName}
+          </Text>
+          <Text style={styles.headerSubtitle}>
+            {exercise.movement.charAt(0).toUpperCase() +
+              exercise.movement.slice(1)}{' '}
+            Movement
+          </Text>
+        </View>
         <View style={styles.placeholder} />
       </View>
 
@@ -258,7 +331,7 @@ export default function ExercisePreviewScreen() {
               styles.tabText,
               activeTab === 'info' && styles.activeTabText,
             ]}>
-            Info
+            Instructions
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -273,24 +346,22 @@ export default function ExercisePreviewScreen() {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'progress' && styles.activeTab]}
-          onPress={() => setActiveTab('progress')}>
+          style={[styles.tab, activeTab === 'tips' && styles.activeTab]}
+          onPress={() => setActiveTab('tips')}>
           <Text
             style={[
               styles.tabText,
-              activeTab === 'progress' && styles.activeTabText,
+              activeTab === 'tips' && styles.activeTabText,
             ]}>
-            Progress
+            Tips & More
           </Text>
         </TouchableOpacity>
       </View>
 
       {/* Content */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {activeTab === 'info' && renderInfoTab()}
-        {activeTab === 'history' && renderHistoryTab()}
-        {activeTab === 'progress' && renderProgressTab()}
-      </ScrollView>
+      {activeTab === 'info' && renderInfoTab()}
+      {activeTab === 'history' && renderHistoryTab()}
+      {activeTab === 'tips' && renderTipsTab()}
     </View>
   );
 }
@@ -317,15 +388,28 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontWeight: 'bold',
   },
-  headerTitle: {
+  headerContent: {
     flex: 1,
+    alignItems: 'center',
+  },
+  headerTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
-    textAlign: 'center',
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   placeholder: {
     width: 40,
+  },
+  errorText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 50,
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -351,10 +435,8 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontWeight: '600',
   },
-  content: {
-    flex: 1,
-  },
   tabContent: {
+    flex: 1,
     padding: 16,
   },
   infoSection: {
@@ -366,25 +448,29 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: 12,
   },
-  infoRow: {
+  detailRow: {
     flexDirection: 'row',
     marginBottom: 8,
   },
-  infoLabel: {
+  detailLabel: {
     fontSize: 16,
     fontWeight: '500',
     color: colors.textSecondary,
-    width: 120,
+    width: 140,
   },
-  infoValue: {
+  detailValue: {
     fontSize: 16,
     color: colors.textPrimary,
     flex: 1,
   },
-  description: {
-    fontSize: 16,
-    color: colors.textPrimary,
-    lineHeight: 24,
+  difficultybeginner: {
+    color: '#4CAF50',
+  },
+  difficultyintermediate: {
+    color: colors.accent,
+  },
+  difficultyadvanced: {
+    color: '#F44336',
   },
   instructionRow: {
     flexDirection: 'row',
@@ -403,98 +489,136 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 22,
   },
-  historyEntry: {
+  mistakeRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+    alignItems: 'flex-start',
+  },
+  bulletPoint: {
+    fontSize: 16,
+    color: '#F44336',
+    width: 20,
+  },
+  mistakeText: {
+    fontSize: 16,
+    color: colors.textPrimary,
+    flex: 1,
+    lineHeight: 22,
+  },
+  tipRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+    alignItems: 'flex-start',
+  },
+  tipIcon: {
+    fontSize: 16,
+    width: 24,
+  },
+  tipText: {
+    fontSize: 16,
+    color: colors.textPrimary,
+    flex: 1,
+    lineHeight: 22,
+  },
+  prCard: {
+    backgroundColor: colors.accent,
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  prTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.buttonText,
+    marginBottom: 8,
+  },
+  prValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.buttonText,
+  },
+  emptyState: {
+    alignItems: 'center',
+    marginTop: 50,
+  },
+  emptyText: {
+    fontSize: 18,
+    color: colors.textSecondary,
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  historyCard: {
     backgroundColor: colors.cardBackground,
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
   },
   historyDate: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textPrimary,
-    marginBottom: 8,
-  },
-  historyStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     marginBottom: 12,
   },
-  historyStat: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
   setsContainer: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: 12,
+    gap: 8,
   },
   setRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
+    justifyContent: 'space-between',
   },
   setNumber: {
     fontSize: 14,
-    fontWeight: '600',
     color: colors.textSecondary,
-    width: 24,
   },
   setData: {
     fontSize: 14,
     color: colors.textPrimary,
-    flex: 1,
+    fontWeight: '500',
   },
-  setVolume: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-  statCard: {
+  programmingCard: {
     backgroundColor: colors.cardBackground,
     borderRadius: 12,
     padding: 16,
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 4,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.accent,
-    marginBottom: 4,
+  programmingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
-  statLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  chartTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 16,
-  },
-  chartContainer: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  chartPlaceholder: {
+  programmingLabel: {
     fontSize: 16,
     color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 24,
+  },
+  programmingValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.accent,
+  },
+  relatedExerciseRow: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  relatedExerciseName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  relatedExerciseInfo: {
+    fontSize: 14,
+    color: colors.textSecondary,
   },
 });
