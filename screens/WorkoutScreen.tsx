@@ -236,7 +236,16 @@ export default function WorkoutScreen() {
   return (
     <View style={styles.container}>
       <WorkoutHeader />
-
+      <View
+        style={{
+          padding: 10,
+          flexDirection: 'row',
+          justifyContent: 'space-around',
+        }}>
+        <Text style={{color: colors.textPrimary}}>
+          Duration: {currentWorkout.duration} min
+        </Text>
+      </View>
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}>

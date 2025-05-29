@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import {colors} from '../../themes/colors';
-import {getOpenAIKey, setOpenAIKey} from '../../utils/generateWorkout';
+import {getOpenAIKey, setOpenAIKey} from '../../service/openAIService';
 
 export default function APIKeySettings() {
   const [apiKey, setApiKey] = useState('');

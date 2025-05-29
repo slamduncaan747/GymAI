@@ -29,7 +29,7 @@ class OpenAIService {
 
       // Filter out recent exercises if provided
       let exercisesToUse = availableExercises;
-      if (params.recentExerciseIds && params.recentExerciseIds.length > 0) {
+      /*if (params.recentExerciseIds && params.recentExerciseIds.length > 0) {
         exercisesToUse = availableExercises.filter(
           ex => !params.recentExerciseIds!.includes(ex.id),
         );
@@ -38,10 +38,10 @@ class OpenAIService {
         if (exercisesToUse.length < 10) {
           exercisesToUse = availableExercises;
         }
-      }
+      }*/
 
       // Calculate target exercise count
-      const exerciseTimeEstimate = 5; // minutes per exercise on average
+      const exerciseTimeEstimate = 7; // minutes per exercise on average
       const targetExerciseCount = Math.max(
         3,
         Math.min(12, Math.floor(params.duration / exerciseTimeEstimate)),
@@ -51,11 +51,7 @@ class OpenAIService {
       const exerciseList = exercisesToUse.map(ex => ({
         id: ex.id,
         name: ex.name,
-        category: ex.category,
-        equipment: ex.equipment,
-        primaryMuscles: ex.muscleGroups.primary.join(', '),
         difficulty: ex.difficulty,
-        movement: ex.movement,
         defaultSets: ex.defaultSets,
         defaultReps: ex.defaultReps,
         defaultRest: ex.defaultRestSeconds,
@@ -100,6 +96,8 @@ Return ONLY a JSON object like this:
           max_tokens: 500,
         }),
       });
+      /*const workoutData = await response.text();
+      console.log('OpenAI API response:', workoutData);*/
 
       if (!response.ok) {
         const error = await response.text();

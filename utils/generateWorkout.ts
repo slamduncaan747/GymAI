@@ -5,6 +5,7 @@ import {exerciseService} from '../service/exerciseService';
 import {createOpenAIService} from '../service/openAIService';
 import {OPENAI_API_KEY} from '../config/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {Alert} from 'react-native';
 
 // Default user preferences if none are set
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -32,7 +33,6 @@ export async function generateWorkout(
         focusAreas,
         recentExerciseIds: await getRecentExerciseIds(),
       });
-
       if (aiWorkout.length > 0) {
         return aiWorkout;
       }
