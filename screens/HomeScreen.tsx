@@ -53,7 +53,10 @@ export default function HomeScreen() {
   };
 
   const handleQuickStart = (duration: number) => {
-    navigation.navigate('Workout', {duration});
+    navigation.navigate('WorkoutPreview', {
+      duration,
+      useAI: false, // Quick workouts use standard generation
+    });
   };
 
   const getMotivationalMessage = () => {

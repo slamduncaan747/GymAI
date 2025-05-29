@@ -61,8 +61,8 @@ export default function WorkoutSelectScreen() {
   const handleStartWorkout = () => {
     if (!selectedDuration) return;
 
-    // Pass additional params for AI generation
-    navigation.navigate('Workout', {
+    // Navigate to preview screen first
+    navigation.navigate('WorkoutPreview', {
       duration: selectedDuration,
       focusAreas:
         selectedMuscleGroups.length > 0 ? selectedMuscleGroups : undefined,

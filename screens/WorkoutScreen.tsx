@@ -23,12 +23,13 @@ import ReplaceExerciseModal from '../components/workout/ReplaceExerciseModal';
 import {colors} from '../themes/colors';
 import {WorkoutExercise} from '../types/workout';
 
-// Update route params to include new options
 type WorkoutScreenRouteProp = RouteProp<RootStackParamList, 'Workout'> & {
   params: {
     duration: number;
     focusAreas?: string[];
     useAI?: boolean;
+    exercises?: WorkoutExercise[];
+    preGenerated?: boolean;
   };
 };
 

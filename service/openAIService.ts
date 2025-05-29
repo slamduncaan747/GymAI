@@ -1,203 +1,238 @@
-// services/openAIService.ts
+// service/openAIService.ts
 
-import {Exercise, WorkoutExercise, UserPreferences} from '../types/workout';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {WorkoutExercise, UserPreferences, Exercise} from '../types/workout';
 import {exerciseService} from './exerciseService';
 
-interface WorkoutGenerationParams {
-  duration: number;
-  preferences: UserPreferences;
-  focusAreas?: Exercise['category'][];
-  recentExerciseIds?: string[];
-}
+const OPENAI_API_KEY_STORAGE = 'openai_api_key';
 
-class OpenAIService {
-  private apiKey: string;
-  private apiUrl = 'https://api.openai.com/v1/chat/completions';
-
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
+export async function getOpenAIKey(): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(OPENAI_API_KEY_STORAGE);
+  } catch (error) {
+    console.error('Error getting OpenAI key:', error);
+    return null;
   }
-
-  async generateWorkout(
-    params: WorkoutGenerationParams,
-  ): Promise<WorkoutExercise[]> {
-    try {
-      // Get available exercises for the user
-      const availableExercises = exerciseService.getExercisesForUser(
-        params.preferences,
-      );
-
-      // Filter out recent exercises if provided
-      let exercisesToUse = availableExercises;
-      /*if (params.recentExerciseIds && params.recentExerciseIds.length > 0) {
-        exercisesToUse = availableExercises.filter(
-          ex => !params.recentExerciseIds!.includes(ex.id),
-        );
-
-        // If we filtered out too many, add some back
-        if (exercisesToUse.length < 10) {
-          exercisesToUse = availableExercises;
-        }
-      }*/
-
-      // Calculate target exercise count
-      const exerciseTimeEstimate = 7; // minutes per exercise on average
-      const targetExerciseCount = Math.max(
-        3,
-        Math.min(12, Math.floor(params.duration / exerciseTimeEstimate)),
-      );
-
-      // Create a simplified exercise list for the AI
-      const exerciseList = exercisesToUse.map(ex => ({
-        id: ex.id,
-        name: ex.name,
-        difficulty: ex.difficulty,
-        defaultSets: ex.defaultSets,
-        defaultReps: ex.defaultReps,
-        defaultRest: ex.defaultRestSeconds,
-      }));
-
-      const systemPrompt = `You are an expert personal trainer. Create a workout by selecting exercises from the provided list.
-Return a JSON array of exercise IDs in the order they should be performed.
-Consider: compound exercises before isolation, proper muscle group balance, and the user's experience level.
-Select exactly ${targetExerciseCount} exercises.`;
-
-      const userPrompt = `Create a ${params.duration}-minute workout.
-User level: ${params.preferences.experienceLevel}
-Goals: ${params.preferences.goals.join(', ')}
-${
-  params.focusAreas
-    ? `Focus on: ${params.focusAreas.join(', ')}`
-    : 'Create a balanced workout'
 }
 
-Available exercises:
-${JSON.stringify(exerciseList, null, 2)}
+export async function setOpenAIKey(key: string): Promise<void> {
+  try {
+    if (key) {
+      await AsyncStorage.setItem(OPENAI_API_KEY_STORAGE, key);
+    } else {
+      await AsyncStorage.removeItem(OPENAI_API_KEY_STORAGE);
+    }
+  } catch (error) {
+    console.error('Error setting OpenAI key:', error);
+  }
+}
 
-Return ONLY a JSON object like this:
-{
-  "exerciseIds": ["exercise_id_1", "exercise_id_2", ...],
-  "notes": "Brief workout description"
-}`;
+interface OpenAIService {
+  generateWorkout: (params: {
+    duration: number;
+    preferences: UserPreferences;
+    focusAreas?: Exercise['category'][];
+    recentExerciseIds?: string[];
+    feedback?: string;
+    currentExercises?: WorkoutExercise[];
+  }) => Promise<WorkoutExercise[]>;
+}
 
-      const response = await fetch(this.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            {role: 'system', content: systemPrompt},
-            {role: 'user', content: userPrompt},
-          ],
-          temperature: 0.7,
-          max_tokens: 500,
-        }),
+export function createOpenAIService(apiKey: string): OpenAIService {
+  const generateWorkout = async (params: {
+    duration: number;
+    preferences: UserPreferences;
+    focusAreas?: Exercise['category'][];
+    recentExerciseIds?: string[];
+    feedback?: string;
+    currentExercises?: WorkoutExercise[];
+  }): Promise<WorkoutExercise[]> => {
+    const {
+      duration,
+      preferences,
+      focusAreas,
+      recentExerciseIds = [],
+      feedback,
+      currentExercises,
+    } = params;
+
+    try {
+      // Get all available exercises
+      const allExercises = exerciseService.getAllExercises();
+
+      // Filter by user preferences
+      const suitableExercises = allExercises.filter(ex => {
+        if (!preferences.availableEquipment.includes(ex.equipment))
+          return false;
+        if (
+          preferences.avoidMuscleGroups?.some(mg =>
+            ex.muscleGroups.primary.includes(mg),
+          )
+        )
+          return false;
+        return true;
       });
-      /*const workoutData = await response.text();
-      console.log('OpenAI API response:', workoutData);*/
+
+      // Create a prompt for OpenAI
+      const prompt = createWorkoutPrompt({
+        duration,
+        preferences,
+        focusAreas,
+        recentExerciseIds,
+        suitableExercises,
+        feedback,
+        currentExercises,
+      });
+
+      // Call OpenAI API
+      const response = await fetch(
+        'https://api.openai.com/v1/chat/completions',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: 'gpt-3.5-turbo',
+            messages: [
+              {
+                role: 'system',
+                content:
+                  'You are a professional fitness trainer creating personalized workout plans. Respond only with a JSON array of exercise IDs.',
+              },
+              {
+                role: 'user',
+                content: prompt,
+              },
+            ],
+            temperature: 0.7,
+            max_tokens: 500,
+          }),
+        },
+      );
 
       if (!response.ok) {
-        const error = await response.text();
-        console.error('OpenAI API error:', error);
         throw new Error(`OpenAI API error: ${response.status}`);
       }
 
       const data = await response.json();
+      const content = data.choices[0]?.message?.content;
 
-      if (!data.choices || !data.choices[0]) {
-        throw new Error('Invalid response from OpenAI');
+      if (!content) {
+        throw new Error('No response from OpenAI');
       }
 
-      const content = data.choices[0].message.content;
-      let aiResponse;
+      // Parse the response to get exercise IDs
+      const exerciseIds = parseAIResponse(content);
 
-      try {
-        aiResponse = JSON.parse(content);
-      } catch (e) {
-        console.error('Failed to parse AI response:', content);
-        throw new Error('Invalid JSON response from AI');
-      }
-
-      // Convert AI response to WorkoutExercise format
+      // Convert IDs to WorkoutExercises
       const workoutExercises: WorkoutExercise[] = [];
-
-      if (aiResponse.exerciseIds && Array.isArray(aiResponse.exerciseIds)) {
-        for (const exerciseId of aiResponse.exerciseIds) {
-          const exercise = exercisesToUse.find(ex => ex.id === exerciseId);
-          if (exercise) {
-            workoutExercises.push(exerciseService.toWorkoutExercise(exercise));
-          }
+      for (const id of exerciseIds) {
+        const exercise = suitableExercises.find(ex => ex.id === id);
+        if (exercise) {
+          workoutExercises.push(exerciseService.toWorkoutExercise(exercise));
         }
       }
 
-      // If we didn't get enough exercises, fall back to standard generation
+      // If we don't have enough exercises, fall back to standard generation
       if (workoutExercises.length < 3) {
-        console.log(
-          'AI generated too few exercises, falling back to standard generation',
-        );
         return exerciseService.generateWorkout(
-          params.duration,
-          params.preferences,
-          params.focusAreas,
+          duration,
+          preferences,
+          focusAreas,
         );
       }
 
       return workoutExercises;
     } catch (error) {
-      console.error('Error generating AI workout:', error);
-      // Fallback to standard generation
-      return exerciseService.generateWorkout(
-        params.duration,
-        params.preferences,
-        params.focusAreas,
-      );
+      console.error('OpenAI workout generation failed:', error);
+      // Fall back to standard generation
+      return exerciseService.generateWorkout(duration, preferences, focusAreas);
     }
-  }
+  };
 
-  async getExerciseRecommendation(
-    currentExerciseId: string,
-    preferences: UserPreferences,
-  ): Promise<Exercise | null> {
-    try {
-      const currentExercise =
-        exerciseService.getExerciseById(currentExerciseId);
-      if (!currentExercise) return null;
-
-      const availableExercises =
-        exerciseService.getExercisesForUser(preferences);
-      const relatedExercises = exerciseService.getRelatedExercises(
-        currentExerciseId,
-        10,
-      );
-
-      // If we have good related exercises, just use the first one
-      if (relatedExercises.length > 0) {
-        return relatedExercises[0];
-      }
-
-      // Otherwise, find a suitable alternative
-      const alternatives = availableExercises.filter(
-        ex =>
-          ex.id !== currentExerciseId &&
-          ex.category === currentExercise.category,
-      );
-
-      if (alternatives.length > 0) {
-        // Return a random alternative
-        return alternatives[Math.floor(Math.random() * alternatives.length)];
-      }
-
-      return null;
-    } catch (error) {
-      console.error('Error getting exercise recommendation:', error);
-      return null;
-    }
-  }
+  return {
+    generateWorkout,
+  };
 }
 
-// Export a function to create the service with API key
-export const createOpenAIService = (apiKey: string) =>
-  new OpenAIService(apiKey);
+function createWorkoutPrompt(params: {
+  duration: number;
+  preferences: UserPreferences;
+  focusAreas?: Exercise['category'][];
+  recentExerciseIds: string[];
+  suitableExercises: Exercise[];
+  feedback?: string;
+  currentExercises?: WorkoutExercise[];
+}): string {
+  const {
+    duration,
+    preferences,
+    focusAreas,
+    recentExerciseIds,
+    suitableExercises,
+    feedback,
+    currentExercises,
+  } = params;
+
+  // Create exercise list with details
+  const exerciseList = suitableExercises
+    .map(
+      ex =>
+        `${ex.id}: ${ex.name} (${ex.category}, ${
+          ex.equipment
+        }, ${ex.muscleGroups.primary.join(', ')})`,
+    )
+    .join('\n');
+
+  let prompt = `Create a ${duration}-minute workout plan for a ${
+    preferences.experienceLevel
+  } level user.
+
+Goals: ${preferences.goals.join(', ')}
+${focusAreas ? `Focus areas: ${focusAreas.join(', ')}` : ''}
+${
+  recentExerciseIds.length > 0
+    ? `Avoid these recently used exercises: ${recentExerciseIds.join(', ')}`
+    : ''
+}
+
+Available exercises:
+${exerciseList}
+
+Guidelines:
+- Select ${Math.max(3, Math.floor(duration / 5))} exercises
+- Balance muscle groups appropriately
+- Order exercises from compound to isolation
+- Consider exercise difficulty for ${preferences.experienceLevel} level
+${focusAreas ? `- Prioritize ${focusAreas.join(' and ')} exercises` : ''}`;
+
+  if (feedback && currentExercises) {
+    const currentExerciseNames = currentExercises.map(ex => ex.name).join(', ');
+    prompt += `\n\nUser feedback on current workout (${currentExerciseNames}): "${feedback}"
+Please adjust the workout based on this feedback.`;
+  }
+
+  prompt +=
+    '\n\nRespond with ONLY a JSON array of exercise IDs, like: ["bench_press_barbell", "squat_barbell", ...]';
+
+  return prompt;
+}
+
+function parseAIResponse(content: string): string[] {
+  try {
+    // Try to extract JSON array from the response
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(id => typeof id === 'string');
+      }
+    }
+    return [];
+  } catch (error) {
+    console.error('Error parsing AI response:', error);
+    return [];
+  }
+}

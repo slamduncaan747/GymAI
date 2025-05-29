@@ -20,21 +20,31 @@ export async function generateWorkout(
   userPreferences?: UserPreferences,
   focusAreas?: Exercise['category'][],
   useAI: boolean = false,
+  feedback?: string,
+  currentExercises?: WorkoutExercise[],
 ): Promise<WorkoutExercise[]> {
   const preferences = userPreferences || DEFAULT_PREFERENCES;
 
   // If AI is requested and we have an API key, use AI generation
-  if (useAI && OPENAI_API_KEY) {
+  if (useAI) {
     try {
-      const openAIService = createOpenAIService(OPENAI_API_KEY);
-      const aiWorkout = await openAIService.generateWorkout({
-        duration,
-        preferences,
-        focusAreas,
-        recentExerciseIds: await getRecentExerciseIds(),
-      });
-      if (aiWorkout.length > 0) {
-        return aiWorkout;
+      // First check if we have a stored API key
+      const storedKey = await AsyncStorage.getItem('openai_api_key');
+      const apiKey = storedKey || OPENAI_API_KEY;
+
+      if (apiKey) {
+        const openAIService = createOpenAIService(apiKey);
+        const aiWorkout = await openAIService.generateWorkout({
+          duration,
+          preferences,
+          focusAreas,
+          recentExerciseIds: await getRecentExerciseIds(),
+          feedback,
+          currentExercises,
+        });
+        if (aiWorkout.length > 0) {
+          return aiWorkout;
+        }
       }
     } catch (error) {
       console.error('AI generation failed, falling back to standard:', error);
