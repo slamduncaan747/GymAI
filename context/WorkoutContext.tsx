@@ -22,7 +22,8 @@ interface WorkoutContextType {
     exerciseIndex: number,
     newExercise: WorkoutExercise,
   ) => void;
-  completeWorkout: () => Promise<void>;
+  completeWorkout: () => Promise<Workout | undefined>;
+  cancelWorkout: () => void;
   loadSavedWorkouts: () => Promise<void>;
 }
 
@@ -33,11 +34,12 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
   const [savedWorkouts, setSavedWorkouts] = useState<Workout[]>([]);
 
   const startWorkout = (duration: number, exercises: WorkoutExercise[]) => {
+    console.log('Starting workout with', exercises.length, 'exercises');
     const workout: Workout = {
       id: `workout_${Date.now()}`,
       timestamp: Date.now(),
       duration,
-      exercises,
+      exercises: [...exercises], // Create a copy to avoid reference issues
       completed: false,
     };
     setCurrentWorkout(workout);
@@ -50,7 +52,10 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
     weight: number,
     completed: boolean = false,
   ) => {
-    if (!currentWorkout) return;
+    if (!currentWorkout) {
+      console.warn('No current workout to update');
+      return;
+    }
 
     if (
       exerciseIndex < 0 ||
@@ -58,18 +63,38 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
       setIndex < 0 ||
       setIndex >= currentWorkout.exercises[exerciseIndex].sets.length
     ) {
-      console.error('Invalid exercise or set index');
+      console.error('Invalid exercise or set index', {exerciseIndex, setIndex});
       return;
     }
 
-    const updatedWorkout = {...currentWorkout};
-    updatedWorkout.exercises[exerciseIndex].sets[setIndex] = {
-      ...updatedWorkout.exercises[exerciseIndex].sets[setIndex],
-      actual,
-      weight,
-      completed,
-    };
-    setCurrentWorkout(updatedWorkout);
+    setCurrentWorkout(prevWorkout => {
+      if (!prevWorkout) return null;
+
+      const updatedWorkout = {
+        ...prevWorkout,
+        exercises: prevWorkout.exercises.map((exercise, exIndex) => {
+          if (exIndex === exerciseIndex) {
+            return {
+              ...exercise,
+              sets: exercise.sets.map((set, sIndex) => {
+                if (sIndex === setIndex) {
+                  return {
+                    ...set,
+                    actual,
+                    weight,
+                    completed,
+                  };
+                }
+                return set;
+              }),
+            };
+          }
+          return exercise;
+        }),
+      };
+
+      return updatedWorkout;
+    });
   };
 
   const addSetToExercise = (exerciseIndex: number, newSet: WorkoutSet) => {
@@ -80,9 +105,22 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
       return;
     }
 
-    const updatedWorkout = {...currentWorkout};
-    updatedWorkout.exercises[exerciseIndex].sets.push(newSet);
-    setCurrentWorkout(updatedWorkout);
+    setCurrentWorkout(prevWorkout => {
+      if (!prevWorkout) return null;
+
+      return {
+        ...prevWorkout,
+        exercises: prevWorkout.exercises.map((exercise, index) => {
+          if (index === exerciseIndex) {
+            return {
+              ...exercise,
+              sets: [...exercise.sets, newSet],
+            };
+          }
+          return exercise;
+        }),
+      };
+    });
   };
 
   const removeSetFromExercise = (exerciseIndex: number, setIndex: number) => {
@@ -103,9 +141,22 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
       return;
     }
 
-    const updatedWorkout = {...currentWorkout};
-    updatedWorkout.exercises[exerciseIndex].sets.splice(setIndex, 1);
-    setCurrentWorkout(updatedWorkout);
+    setCurrentWorkout(prevWorkout => {
+      if (!prevWorkout) return null;
+
+      return {
+        ...prevWorkout,
+        exercises: prevWorkout.exercises.map((exercise, exIndex) => {
+          if (exIndex === exerciseIndex) {
+            return {
+              ...exercise,
+              sets: exercise.sets.filter((_, sIndex) => sIndex !== setIndex),
+            };
+          }
+          return exercise;
+        }),
+      };
+    });
   };
 
   const updateExerciseRestTime = (exerciseIndex: number, restTime: number) => {
@@ -116,9 +167,22 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
       return;
     }
 
-    const updatedWorkout = {...currentWorkout};
-    updatedWorkout.exercises[exerciseIndex].restTime = restTime;
-    setCurrentWorkout(updatedWorkout);
+    setCurrentWorkout(prevWorkout => {
+      if (!prevWorkout) return null;
+
+      return {
+        ...prevWorkout,
+        exercises: prevWorkout.exercises.map((exercise, index) => {
+          if (index === exerciseIndex) {
+            return {
+              ...exercise,
+              restTime,
+            };
+          }
+          return exercise;
+        }),
+      };
+    });
   };
 
   const removeExercise = (exerciseIndex: number) => {
@@ -133,17 +197,29 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
       return;
     }
 
-    const updatedWorkout = {...currentWorkout};
-    updatedWorkout.exercises.splice(exerciseIndex, 1);
-    setCurrentWorkout(updatedWorkout);
+    setCurrentWorkout(prevWorkout => {
+      if (!prevWorkout) return null;
+
+      return {
+        ...prevWorkout,
+        exercises: prevWorkout.exercises.filter(
+          (_, index) => index !== exerciseIndex,
+        ),
+      };
+    });
   };
 
   const reorderExercises = (newOrder: WorkoutExercise[]) => {
     if (!currentWorkout) return;
 
-    const updatedWorkout = {...currentWorkout};
-    updatedWorkout.exercises = newOrder;
-    setCurrentWorkout(updatedWorkout);
+    setCurrentWorkout(prevWorkout => {
+      if (!prevWorkout) return null;
+
+      return {
+        ...prevWorkout,
+        exercises: [...newOrder],
+      };
+    });
   };
 
   const replaceExercise = (
@@ -157,15 +233,25 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
       return;
     }
 
-    const updatedWorkout = {...currentWorkout};
-    updatedWorkout.exercises[exerciseIndex] = newExercise;
-    setCurrentWorkout(updatedWorkout);
+    setCurrentWorkout(prevWorkout => {
+      if (!prevWorkout) return null;
+
+      return {
+        ...prevWorkout,
+        exercises: prevWorkout.exercises.map((exercise, index) => {
+          if (index === exerciseIndex) {
+            return newExercise;
+          }
+          return exercise;
+        }),
+      };
+    });
   };
 
   const completeWorkout = async () => {
     if (!currentWorkout) return;
 
-    const completedWorkout = {
+    const completedWorkout: Workout = {
       ...currentWorkout,
       completed: true,
     };
@@ -177,17 +263,31 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
         'savedWorkouts',
         JSON.stringify(updatedWorkouts),
       );
+
+      console.log('Workout completed and saved');
+
+      // Return the completed workout so the screen can navigate to summary
+      const workoutToReturn = completedWorkout;
       setCurrentWorkout(null);
+      return workoutToReturn;
     } catch (error) {
       console.error('Error saving workout:', error);
+      throw error;
     }
+  };
+
+  const cancelWorkout = () => {
+    console.log('Canceling workout');
+    setCurrentWorkout(null);
   };
 
   const loadSavedWorkouts = async () => {
     try {
       const saved = await AsyncStorage.getItem('savedWorkouts');
       if (saved) {
-        setSavedWorkouts(JSON.parse(saved));
+        const workouts = JSON.parse(saved);
+        setSavedWorkouts(workouts);
+        console.log('Loaded', workouts.length, 'saved workouts');
       }
     } catch (error) {
       console.error('Error loading workouts:', error);
@@ -208,6 +308,7 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
         reorderExercises,
         replaceExercise,
         completeWorkout,
+        cancelWorkout,
         loadSavedWorkouts,
       }}>
       {children}

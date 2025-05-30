@@ -29,16 +29,7 @@ import ReplaceExerciseModal from '../components/workout/ReplaceExerciseModal';
 import {colors} from '../themes/colors';
 import {WorkoutExercise} from '../types/workout';
 
-type WorkoutScreenRouteProp = RouteProp<RootStackParamList, 'Workout'> & {
-  params: {
-    duration: number;
-    focusAreas?: string[];
-    useAI?: boolean;
-    exercises?: WorkoutExercise[];
-    preGenerated?: boolean;
-  };
-};
-
+type WorkoutScreenRouteProp = RouteProp<RootStackParamList, 'Workout'>;
 type WorkoutScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
   'Workout'
@@ -58,7 +49,8 @@ export default function WorkoutScreen() {
     useAI = false,
     exercises: preGeneratedExercises,
     preGenerated = false,
-  } = route.params;
+  } = route.params || {};
+
   const {
     currentWorkout,
     startWorkout,
@@ -69,7 +61,8 @@ export default function WorkoutScreen() {
     reorderExercises,
     replaceExercise,
   } = useWorkout();
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null);
   const [timerUpdated, setTimerUpdated] = useState<boolean>(true);
   const [showReorderModal, setShowReorderModal] = useState<boolean>(false);
@@ -77,7 +70,7 @@ export default function WorkoutScreen() {
   const [exerciseToReplace, setExerciseToReplace] = useState<number | null>(
     null,
   );
-  const [workoutInitialized, setWorkoutInitialized] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Handle back button press
   useFocusEffect(
@@ -90,30 +83,37 @@ export default function WorkoutScreen() {
         return false;
       };
 
-      BackHandler.addEventListener('hardwareBackPress', onBackPress);
-      return () =>
-        BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        onBackPress,
+      );
+      return () => subscription.remove();
     }, [currentWorkout]),
   );
 
   // Override navigation back button
   React.useLayoutEffect(() => {
     navigation.setOptions({
-      headerLeft: () => null, // Remove default back button
-      gestureEnabled: false, // Disable swipe back on iOS
+      headerLeft: () => null,
+      gestureEnabled: false,
     });
   }, [navigation]);
 
   useEffect(() => {
-    // Only initialize workout once
-    if (!workoutInitialized) {
-      initializeWorkout();
-    }
+    initializeWorkout();
   }, []);
 
   const initializeWorkout = async () => {
     try {
       setIsLoading(true);
+      setError(null);
+
+      // Validate required parameters
+      if (!duration) {
+        throw new Error('Duration is required');
+      }
+
+      let exercisesToUse: WorkoutExercise[] = [];
 
       if (
         preGenerated &&
@@ -121,35 +121,31 @@ export default function WorkoutScreen() {
         preGeneratedExercises.length > 0
       ) {
         console.log(
-          'Starting workout with pre-generated exercises:',
+          'Using pre-generated exercises:',
           preGeneratedExercises.length,
         );
-        // Clear any existing workout and start fresh
-        await new Promise(resolve => setTimeout(resolve, 100)); // Small delay to ensure state updates
-        startWorkout(duration, preGeneratedExercises);
-        setWorkoutInitialized(true);
-      } else if (!preGenerated) {
-        // Legacy flow - generate new workout
-        const exercises = await generateWorkout(
+        exercisesToUse = preGeneratedExercises;
+      } else {
+        console.log('Generating new workout...');
+        exercisesToUse = await generateWorkout(
           duration,
           undefined,
           focusAreas as any,
           useAI,
         );
-        if (exercises && exercises.length > 0) {
-          startWorkout(duration, exercises);
-          setWorkoutInitialized(true);
-        } else {
-          throw new Error('No exercises generated');
-        }
-      } else {
-        throw new Error('No exercises provided');
       }
+
+      if (!exercisesToUse || exercisesToUse.length === 0) {
+        throw new Error('No exercises were generated');
+      }
+
+      console.log('Starting workout with', exercisesToUse.length, 'exercises');
+      startWorkout(duration, exercisesToUse);
     } catch (error) {
       console.error('Error initializing workout:', error);
-      Alert.alert('Error', 'Failed to start workout. Please try again.', [
-        {text: 'OK', onPress: () => navigation.goBack()},
-      ]);
+      setError(
+        error instanceof Error ? error.message : 'Failed to initialize workout',
+      );
     } finally {
       setIsLoading(false);
     }
@@ -180,8 +176,12 @@ export default function WorkoutScreen() {
 
   const handleCompleteWorkout = async () => {
     try {
-      await completeWorkout();
-      navigation.navigate('Home');
+      const completedWorkout = await completeWorkout();
+      if (completedWorkout) {
+        navigation.navigate('WorkoutSummary', {workout: completedWorkout});
+      } else {
+        navigation.navigate('MainTabs');
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to save workout');
     }
@@ -198,7 +198,7 @@ export default function WorkoutScreen() {
           style: 'destructive',
           onPress: () => {
             cancelWorkout();
-            navigation.navigate('Home');
+            navigation.navigate('MainTabs');
           },
         },
       ],
@@ -213,17 +213,15 @@ export default function WorkoutScreen() {
     completed: boolean = false,
     restTime?: number,
   ) => {
-    if (currentWorkout) {
-      updateExerciseSet(exerciseIndex, setIndex, actual, weight, completed);
+    updateExerciseSet(exerciseIndex, setIndex, actual, weight, completed);
 
-      // Only start timer if set is completed and restTime is provided
-      if (completed && restTime) {
-        setActiveTimer({
-          exerciseIndex,
-          restTime,
-        });
-        setTimerUpdated(false);
-      }
+    // Only start timer if set is completed and restTime is provided
+    if (completed && restTime) {
+      setActiveTimer({
+        exerciseIndex,
+        restTime,
+      });
+      setTimerUpdated(false);
     }
   };
 
@@ -253,31 +251,26 @@ export default function WorkoutScreen() {
         {
           text: 'Remove',
           style: 'destructive',
-          onPress: () => {
-            if (removeExercise) {
-              removeExercise(exerciseIndex);
-            }
-          },
+          onPress: () => removeExercise(exerciseIndex),
         },
       ],
     );
   };
 
   const handleReorderComplete = (newOrder: WorkoutExercise[]) => {
-    if (reorderExercises) {
-      reorderExercises(newOrder);
-    }
+    reorderExercises(newOrder);
     setShowReorderModal(false);
   };
 
   const handleReplaceComplete = (newExercise: WorkoutExercise) => {
-    if (exerciseToReplace !== null && replaceExercise) {
+    if (exerciseToReplace !== null) {
       replaceExercise(exerciseToReplace, newExercise);
     }
     setShowReplaceModal(false);
     setExerciseToReplace(null);
   };
 
+  // Loading state
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -287,10 +280,12 @@ export default function WorkoutScreen() {
     );
   }
 
-  if (!currentWorkout || !workoutInitialized) {
+  // Error state
+  if (error) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>No active workout</Text>
+        <Text style={styles.errorTitle}>Workout Error</Text>
+        <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity
           style={styles.retryButton}
           onPress={() => navigation.goBack()}>
@@ -300,18 +295,40 @@ export default function WorkoutScreen() {
     );
   }
 
+  // No workout state
+  if (!currentWorkout) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorTitle}>No Active Workout</Text>
+        <Text style={styles.errorText}>
+          Unable to load workout. Please try creating a new one.
+        </Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => navigation.navigate('MainTabs')}>
+          <Text style={styles.retryButtonText}>Go Home</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <WorkoutHeader />
+
+      {/* Info Bar */}
       <View style={styles.infoBar}>
         <Text style={styles.infoText}>
           Duration: {currentWorkout.duration} min •{' '}
           {currentWorkout.exercises.length} exercises
         </Text>
       </View>
+
+      {/* Exercises */}
       <ScrollView
         style={styles.scrollView}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}>
         {currentWorkout.exercises.map((exercise, index) => (
           <ExerciseCard
             key={`${exercise.id}-${index}`}
@@ -332,12 +349,15 @@ export default function WorkoutScreen() {
             onRemoveExercise={handleRemoveExercise}
           />
         ))}
+
+        {/* Action Buttons */}
         <View style={styles.actionButtons}>
           <TouchableOpacity
             style={styles.discardButton}
             onPress={handleDiscardWorkout}>
             <Text style={styles.discardButtonText}>Discard Workout</Text>
           </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.completeButton}
             onPress={() => {
@@ -355,6 +375,7 @@ export default function WorkoutScreen() {
         </View>
       </ScrollView>
 
+      {/* Timer Modal */}
       <TimerModal
         visible={!!activeTimer}
         onDismiss={handleTimerFinished}
@@ -363,6 +384,7 @@ export default function WorkoutScreen() {
         setTimerUpdated={setTimerUpdated}
       />
 
+      {/* Reorder Modal */}
       {showReorderModal && currentWorkout && (
         <ReorderExercisesModal
           visible={showReorderModal}
@@ -372,7 +394,8 @@ export default function WorkoutScreen() {
         />
       )}
 
-      {showReplaceModal && (
+      {/* Replace Modal */}
+      {showReplaceModal && exerciseToReplace !== null && (
         <ReplaceExerciseModal
           visible={showReplaceModal}
           onClose={() => {
@@ -380,11 +403,7 @@ export default function WorkoutScreen() {
             setExerciseToReplace(null);
           }}
           onReplace={handleReplaceComplete}
-          currentExerciseId={
-            exerciseToReplace !== null
-              ? currentWorkout.exercises[exerciseToReplace].id
-              : ''
-          }
+          currentExerciseId={currentWorkout.exercises[exerciseToReplace].id}
         />
       )}
     </View>
@@ -416,11 +435,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
+  errorTitle: {
+    color: colors.textPrimary,
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
   errorText: {
     color: colors.textSecondary,
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 20,
+    lineHeight: 22,
   },
   retryButton: {
     backgroundColor: colors.accent,
@@ -447,11 +474,14 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 10,
+    paddingBottom: 40,
   },
   actionButtons: {
-    marginVertical: 30,
+    marginTop: 30,
     gap: 12,
   },
   discardButton: {

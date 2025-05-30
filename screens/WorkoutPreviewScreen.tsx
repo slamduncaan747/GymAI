@@ -57,6 +57,7 @@ export default function WorkoutPreviewScreen() {
       summary: '',
       reasoning: '',
     });
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     generateInitialWorkout();
@@ -66,6 +67,14 @@ export default function WorkoutPreviewScreen() {
     exercises: WorkoutExercise[],
     method: 'AI' | 'Standard',
   ) => {
+    if (exercises.length === 0) {
+      setWorkoutDescription({
+        summary: 'No exercises generated',
+        reasoning: 'Please try regenerating the workout.',
+      });
+      return;
+    }
+
     // Analyze the workout
     const muscleGroups = new Set<string>();
     const equipment = new Set<string>();
@@ -88,7 +97,7 @@ export default function WorkoutPreviewScreen() {
     } else if (muscleGroupsArray.length > 2) {
       summary += 'full-body ';
     } else {
-      summary += `${muscleGroupsArray.join(' & ')} `;
+      summary += `${muscleGroupsArray.slice(0, 2).join(' & ')} `;
     }
     summary += `workout using ${equipmentArray.slice(0, 2).join(' and ')}.`;
 
@@ -104,18 +113,38 @@ export default function WorkoutPreviewScreen() {
   const generateInitialWorkout = async () => {
     try {
       setIsLoading(true);
+      setError(null);
+
+      if (!duration) {
+        throw new Error('Duration is required');
+      }
+
+      console.log('Generating workout with params:', {
+        duration,
+        focusAreas,
+        useAI,
+      });
+
       const generated = await generateWorkout(
         duration,
         undefined,
         focusAreas as any,
         useAI,
       );
+
+      if (!generated || generated.length === 0) {
+        throw new Error('No exercises were generated');
+      }
+
+      console.log('Generated', generated.length, 'exercises');
       setExercises(generated);
       setGenerationMethod(useAI ? 'AI' : 'Standard');
       generateWorkoutDescription(generated, useAI ? 'AI' : 'Standard');
     } catch (error) {
       console.error('Error generating workout:', error);
-      Alert.alert('Error', 'Failed to generate workout. Please try again.');
+      setError(
+        error instanceof Error ? error.message : 'Failed to generate workout',
+      );
     } finally {
       setIsLoading(false);
     }
@@ -130,8 +159,13 @@ export default function WorkoutPreviewScreen() {
         focusAreas as any,
         useAI,
       );
-      setExercises(generated);
-      generateWorkoutDescription(generated, generationMethod);
+
+      if (generated && generated.length > 0) {
+        setExercises(generated);
+        generateWorkoutDescription(generated, generationMethod);
+      } else {
+        throw new Error('No exercises generated');
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to regenerate workout.');
     } finally {
@@ -158,11 +192,16 @@ export default function WorkoutPreviewScreen() {
         feedback,
         exercises, // Pass current exercises for context
       );
-      setExercises(generated);
-      setFeedback('');
-      setGenerationMethod('AI');
-      generateWorkoutDescription(generated, 'AI');
-      Alert.alert('Success', 'Workout regenerated based on your feedback!');
+
+      if (generated && generated.length > 0) {
+        setExercises(generated);
+        setFeedback('');
+        setGenerationMethod('AI');
+        generateWorkoutDescription(generated, 'AI');
+        Alert.alert('Success', 'Workout regenerated based on your feedback!');
+      } else {
+        throw new Error('No exercises generated with feedback');
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to regenerate workout with feedback.');
     } finally {
@@ -185,8 +224,7 @@ export default function WorkoutPreviewScreen() {
           text: 'Remove',
           style: 'destructive',
           onPress: () => {
-            const newExercises = [...exercises];
-            newExercises.splice(index, 1);
+            const newExercises = exercises.filter((_, i) => i !== index);
             setExercises(newExercises);
             generateWorkoutDescription(newExercises, generationMethod);
           },
@@ -223,7 +261,16 @@ export default function WorkoutPreviewScreen() {
   };
 
   const handleStartWorkout = () => {
-    console.log('Starting workout with exercises:', exercises.length);
+    if (!exercises || exercises.length === 0) {
+      Alert.alert('Error', 'No exercises available to start workout.');
+      return;
+    }
+
+    console.log(
+      'Starting workout with',
+      exercises.length,
+      'exercises from preview',
+    );
     navigation.navigate('Workout', {
       duration,
       exercises: exercises,
@@ -242,6 +289,7 @@ export default function WorkoutPreviewScreen() {
     return Math.round(totalSets * avgTimePerSet);
   };
 
+  // Loading state
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -252,6 +300,32 @@ export default function WorkoutPreviewScreen() {
               ? '🤖 AI is crafting your personalized workout...'
               : 'Generating your workout...'}
           </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}>
+            <Text style={styles.backButtonText}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>Workout Error</Text>
+          <View style={styles.placeholder} />
+        </View>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorTitle}>Generation Failed</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={generateInitialWorkout}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -428,6 +502,36 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginTop: 20,
     textAlign: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+    marginBottom: 12,
+  },
+  errorText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  retryButton: {
+    backgroundColor: colors.accent,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: colors.buttonText,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   header: {
     flexDirection: 'row',
