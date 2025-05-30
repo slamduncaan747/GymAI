@@ -73,7 +73,7 @@ export default function WorkoutScreen() {
       setIsLoading(false);
       return;
     }
-
+    Alert.alert('No Workout Found');
     generateWorkoutAsync();
   }, [currentWorkout, duration, focusAreas, useAI]);
 

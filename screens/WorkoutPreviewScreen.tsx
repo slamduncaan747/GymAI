@@ -30,6 +30,11 @@ type WorkoutPreviewScreenNavigationProp = StackNavigationProp<
   'WorkoutPreview'
 >;
 
+interface WorkoutDescription {
+  summary: string;
+  reasoning: string;
+}
+
 export default function WorkoutPreviewScreen() {
   const navigation = useNavigation<WorkoutPreviewScreenNavigationProp>();
   const route = useRoute<WorkoutPreviewScreenRouteProp>();
@@ -39,6 +44,7 @@ export default function WorkoutPreviewScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [showReplaceModal, setShowReplaceModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [exerciseToReplace, setExerciseToReplace] = useState<number | null>(
     null,
   );
@@ -46,10 +52,54 @@ export default function WorkoutPreviewScreen() {
   const [generationMethod, setGenerationMethod] = useState<'AI' | 'Standard'>(
     'Standard',
   );
+  const [workoutDescription, setWorkoutDescription] =
+    useState<WorkoutDescription>({
+      summary: '',
+      reasoning: '',
+    });
 
   useEffect(() => {
     generateInitialWorkout();
   }, []);
+
+  const generateWorkoutDescription = (
+    exercises: WorkoutExercise[],
+    method: 'AI' | 'Standard',
+  ) => {
+    // Analyze the workout
+    const muscleGroups = new Set<string>();
+    const equipment = new Set<string>();
+
+    exercises.forEach(ex => {
+      const fullExercise = exerciseService.getExerciseById(ex.id);
+      if (fullExercise) {
+        fullExercise.muscleGroups.primary.forEach(mg => muscleGroups.add(mg));
+        equipment.add(fullExercise.equipment);
+      }
+    });
+
+    const muscleGroupsArray = Array.from(muscleGroups);
+    const equipmentArray = Array.from(equipment);
+
+    // Create summary
+    let summary = `${exercises.length}-exercise `;
+    if (focusAreas && focusAreas.length > 0) {
+      summary += `${focusAreas.join(' & ')} focused `;
+    } else if (muscleGroupsArray.length > 2) {
+      summary += 'full-body ';
+    } else {
+      summary += `${muscleGroupsArray.join(' & ')} `;
+    }
+    summary += `workout using ${equipmentArray.slice(0, 2).join(' and ')}.`;
+
+    // Create reasoning
+    let reasoning =
+      method === 'AI'
+        ? '🤖 AI selected these exercises based on your preferences, balancing muscle groups and progressive difficulty.'
+        : '⚡ Exercises selected to provide a balanced workout with proven compound and isolation movements.';
+
+    setWorkoutDescription({summary, reasoning});
+  };
 
   const generateInitialWorkout = async () => {
     try {
@@ -62,6 +112,7 @@ export default function WorkoutPreviewScreen() {
       );
       setExercises(generated);
       setGenerationMethod(useAI ? 'AI' : 'Standard');
+      generateWorkoutDescription(generated, useAI ? 'AI' : 'Standard');
     } catch (error) {
       console.error('Error generating workout:', error);
       Alert.alert('Error', 'Failed to generate workout. Please try again.');
@@ -80,6 +131,7 @@ export default function WorkoutPreviewScreen() {
         useAI,
       );
       setExercises(generated);
+      generateWorkoutDescription(generated, generationMethod);
     } catch (error) {
       Alert.alert('Error', 'Failed to regenerate workout.');
     } finally {
@@ -109,6 +161,7 @@ export default function WorkoutPreviewScreen() {
       setExercises(generated);
       setFeedback('');
       setGenerationMethod('AI');
+      generateWorkoutDescription(generated, 'AI');
       Alert.alert('Success', 'Workout regenerated based on your feedback!');
     } catch (error) {
       Alert.alert('Error', 'Failed to regenerate workout with feedback.');
@@ -123,9 +176,23 @@ export default function WorkoutPreviewScreen() {
       return;
     }
 
-    const newExercises = [...exercises];
-    newExercises.splice(index, 1);
-    setExercises(newExercises);
+    Alert.alert(
+      'Remove Exercise',
+      `Remove ${exercises[index].name} from workout?`,
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            const newExercises = [...exercises];
+            newExercises.splice(index, 1);
+            setExercises(newExercises);
+            generateWorkoutDescription(newExercises, generationMethod);
+          },
+        },
+      ],
+    );
   };
 
   const handleReplaceExercise = (index: number) => {
@@ -138,15 +205,28 @@ export default function WorkoutPreviewScreen() {
       const newExercises = [...exercises];
       newExercises[exerciseToReplace] = newExercise;
       setExercises(newExercises);
+      generateWorkoutDescription(newExercises, generationMethod);
     }
     setShowReplaceModal(false);
     setExerciseToReplace(null);
   };
 
+  const handleAddExercise = () => {
+    setShowAddModal(true);
+  };
+
+  const handleAddComplete = (newExercise: WorkoutExercise) => {
+    const newExercises = [...exercises, newExercise];
+    setExercises(newExercises);
+    generateWorkoutDescription(newExercises, generationMethod);
+    setShowAddModal(false);
+  };
+
   const handleStartWorkout = () => {
+    console.log('Starting workout with exercises:', exercises.length);
     navigation.navigate('Workout', {
       duration,
-      exercises,
+      exercises: exercises,
       preGenerated: true,
     });
   };
@@ -155,13 +235,11 @@ export default function WorkoutPreviewScreen() {
     return exercises.reduce((total, ex) => total + ex.sets.length, 0);
   };
 
-  const getEstimatedVolume = () => {
-    // This is a rough estimate based on typical weights
-    return exercises.reduce((total, ex) => {
-      const avgWeight = ex.sets[0]?.weight || 100;
-      const totalReps = ex.sets.reduce((sum, set) => sum + set.target, 0);
-      return total + avgWeight * totalReps;
-    }, 0);
+  const getEstimatedTime = () => {
+    // Estimate based on sets and rest time
+    const totalSets = getTotalSets();
+    const avgTimePerSet = 1.5; // minutes including rest
+    return Math.round(totalSets * avgTimePerSet);
   };
 
   if (isLoading) {
@@ -205,16 +283,34 @@ export default function WorkoutPreviewScreen() {
             </Text>
           </View>
           <Text style={styles.generationSubtext}>
-            {duration} min • {exercises.length} exercises • {getTotalSets()}{' '}
-            total sets
+            ~{getEstimatedTime()} min • {exercises.length} exercises •{' '}
+            {getTotalSets()} total sets
+          </Text>
+        </View>
+
+        {/* Workout Description */}
+        <View style={styles.descriptionContainer}>
+          <Text style={styles.descriptionSummary}>
+            {workoutDescription.summary}
+          </Text>
+          <Text style={styles.descriptionReasoning}>
+            {workoutDescription.reasoning}
           </Text>
         </View>
 
         {/* Exercises List */}
         <View style={styles.exercisesContainer}>
-          <Text style={styles.sectionTitle}>Exercises</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Exercises</Text>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={handleAddExercise}>
+              <Text style={styles.addButtonText}>+ Add</Text>
+            </TouchableOpacity>
+          </View>
+
           {exercises.map((exercise, index) => (
-            <View key={exercise.id} style={styles.exerciseCard}>
+            <View key={`${exercise.id}-${index}`} style={styles.exerciseCard}>
               <View style={styles.exerciseHeader}>
                 <View style={styles.exerciseInfo}>
                   <Text style={styles.exerciseNumber}>{index + 1}</Text>
@@ -304,6 +400,15 @@ export default function WorkoutPreviewScreen() {
           currentExerciseId={exercises[exerciseToReplace].id}
         />
       )}
+
+      {showAddModal && (
+        <ReplaceExerciseModal
+          visible={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          onReplace={handleAddComplete}
+          currentExerciseId=""
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -355,9 +460,8 @@ const styles = StyleSheet.create({
   },
   generationInfo: {
     alignItems: 'center',
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingTop: 20,
+    paddingBottom: 12,
   },
   generationBadge: {
     flexDirection: 'row',
@@ -381,14 +485,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
   },
+  descriptionContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  descriptionSummary: {
+    fontSize: 16,
+    color: colors.textPrimary,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  descriptionReasoning: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+  },
   exercisesContainer: {
     padding: 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: colors.textPrimary,
-    marginBottom: 16,
+  },
+  addButton: {
+    backgroundColor: colors.accent,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  addButtonText: {
+    color: colors.buttonText,
+    fontSize: 14,
+    fontWeight: '600',
   },
   exerciseCard: {
     backgroundColor: colors.cardBackground,

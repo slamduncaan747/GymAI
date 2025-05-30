@@ -1,4 +1,14 @@
 {
   "name": "GymAIApp",
-  "displayName": "GymAIApp"
+  "extra": {
+    "eas": {
+      "projectId": "02c30f58-01d3-4965-88f8-1669271902ea"
+    }
+  },
+  "android": {
+    "package": "com.dl8.gymaiapp"
+  },
+  "ios": {
+    "bundleIdentifier": "com.dl8.gymaiapp"
+  }
 }
