@@ -103,15 +103,19 @@ export default function WorkoutSummaryScreen() {
   };
 
   const handleDone = () => {
-    // Navigate to home and reset the stack
+    // Navigate back to the main tabs
     navigation.reset({
       index: 0,
-      routes: [{name: 'Home'}],
+      routes: [{name: 'MainTabs'}],
     });
   };
 
   const handleStartAnother = () => {
-    navigation.navigate('WorkoutSelect');
+    // Navigate to workout select (which is the default tab)
+    navigation.reset({
+      index: 0,
+      routes: [{name: 'MainTabs'}],
+    });
   };
 
   return (
@@ -180,7 +184,9 @@ export default function WorkoutSummaryScreen() {
               );
 
               return (
-                <View key={exercise.id} style={styles.exerciseCard}>
+                <View
+                  key={`${exercise.id}-${index}`}
+                  style={styles.exerciseCard}>
                   <View style={styles.exerciseHeader}>
                     <Text style={styles.exerciseName}>{exercise.name}</Text>
                     <Text style={styles.exerciseCompletion}>

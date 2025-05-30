@@ -6,6 +6,7 @@ import {createStackNavigator} from '@react-navigation/stack';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {WorkoutProvider} from './context/WorkoutContext';
 import HomeScreen from './screens/HomeScreen';
+import HistoryScreen from './screens/HistoryScreen';
 import WorkoutSelectScreen from './screens/WorkoutSelectScreen';
 import WorkoutPreviewScreen from './screens/WorkoutPreviewScreen';
 import WorkoutScreen from './screens/WorkoutScreen';
@@ -38,24 +39,32 @@ export type RootStackParamList = {
     exerciseName: string;
     exerciseId: string;
   };
+  Settings: undefined;
 };
 
 export type TabParamList = {
-  Home: undefined;
-  Workouts: undefined;
-  Settings: undefined;
+  WorkoutTab: undefined;
+  Progress: undefined;
+  History: undefined;
+  Profile: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
 
-function WorkoutsScreen() {
-  return <WorkoutSelectScreen />;
+// Use the actual screens
+function ProgressScreen() {
+  return <HomeScreen />;
+}
+
+function ProfileScreen() {
+  return <SettingsScreen />;
 }
 
 function MainTabs() {
   return (
     <Tab.Navigator
+      initialRouteName="WorkoutTab"
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
@@ -75,30 +84,39 @@ function MainTabs() {
         },
       }}>
       <Tab.Screen
-        name="Workouts"
-        component={WorkoutsScreen}
+        name="WorkoutTab"
+        component={WorkoutSelectScreen}
         options={{
+          tabBarLabel: 'Workout',
           tabBarIcon: ({color, size}) => (
             <Text style={{fontSize: size, color}}>💪</Text>
           ),
         }}
       />
       <Tab.Screen
-        name="Home"
-        component={HomeScreen}
+        name="Progress"
+        component={ProgressScreen}
         options={{
           tabBarIcon: ({color, size}) => (
             <Text style={{fontSize: size, color}}>📊</Text>
           ),
-          tabBarLabel: 'Progress',
         }}
       />
       <Tab.Screen
-        name="Settings"
-        component={SettingsScreen}
+        name="History"
+        component={HistoryScreen}
         options={{
           tabBarIcon: ({color, size}) => (
-            <Text style={{fontSize: size, color}}>⚙️</Text>
+            <Text style={{fontSize: size, color}}>📅</Text>
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          tabBarIcon: ({color, size}) => (
+            <Text style={{fontSize: size, color}}>👤</Text>
           ),
         }}
       />
@@ -133,6 +151,7 @@ export default function App() {
             name="ExercisePreview"
             component={ExercisePreviewScreen}
           />
+          <Stack.Screen name="Settings" component={SettingsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </WorkoutProvider>

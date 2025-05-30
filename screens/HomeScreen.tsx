@@ -5,24 +5,17 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
   Dimensions,
   SafeAreaView,
 } from 'react-native';
-import {useNavigation} from '@react-navigation/native';
-import {StackNavigationProp} from '@react-navigation/stack';
-import {RootStackParamList} from '../App';
 import {useWorkout} from '../context/WorkoutContext';
 import {colors} from '../themes/colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
-
 const {width} = Dimensions.get('window');
 
 export default function HomeScreen() {
-  const navigation = useNavigation<HomeScreenNavigationProp>();
   const {loadSavedWorkouts, savedWorkouts} = useWorkout();
   const [userName, setUserName] = useState('');
 
@@ -38,10 +31,6 @@ export default function HomeScreen() {
     } catch (error) {
       console.error('Error loading user name:', error);
     }
-  };
-
-  const handleStartWorkout = () => {
-    navigation.navigate('WorkoutSelect');
   };
 
   const getTotalWorkouts = () => savedWorkouts.length;
@@ -120,29 +109,11 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}>
         {/* Header */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.welcomeText}>
-              {userName ? `Hi, ${userName}` : 'Ready to Train?'}
-            </Text>
-            <Text style={styles.subtitleText}>Start your workout</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.settingsButton}
-            onPress={() => navigation.navigate('Settings' as any)}>
-            <Text style={styles.settingsIcon}>⚙️</Text>
-          </TouchableOpacity>
+          <Text style={styles.welcomeText}>
+            {userName ? `${userName}'s Progress` : 'Your Progress'}
+          </Text>
+          <Text style={styles.subtitleText}>Track your fitness journey</Text>
         </View>
-
-        {/* Main CTA Button */}
-        <TouchableOpacity
-          style={styles.mainCTAButton}
-          onPress={handleStartWorkout}
-          activeOpacity={0.9}>
-          <View style={styles.ctaContent}>
-            <Text style={styles.ctaText}>START WORKOUT</Text>
-            <Text style={styles.ctaSubtext}>Create your training session</Text>
-          </View>
-        </TouchableOpacity>
 
         {/* Stats Overview */}
         <View style={styles.statsSection}>
@@ -213,7 +184,7 @@ export default function HomeScreen() {
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateTitle}>No workouts yet</Text>
             <Text style={styles.emptyStateText}>
-              Start your first workout to track your progress
+              Complete your first workout to see your progress
             </Text>
           </View>
         )}
@@ -234,9 +205,6 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
     paddingHorizontal: 20,
     paddingTop: 20,
     marginBottom: 30,
@@ -250,46 +218,6 @@ const styles = StyleSheet.create({
   subtitleText: {
     fontSize: 16,
     color: colors.textSecondary,
-  },
-  settingsButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.cardBackground,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  settingsIcon: {
-    fontSize: 20,
-  },
-  mainCTAButton: {
-    marginHorizontal: 20,
-    marginBottom: 30,
-    borderRadius: 16,
-    overflow: 'hidden',
-    elevation: 4,
-    shadowColor: colors.accent,
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  ctaContent: {
-    backgroundColor: colors.accent,
-    paddingVertical: 20,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-  },
-  ctaText: {
-    color: colors.buttonText,
-    fontSize: 20,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  ctaSubtext: {
-    color: colors.buttonText,
-    fontSize: 14,
-    opacity: 0.9,
   },
   section: {
     paddingHorizontal: 20,
