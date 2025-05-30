@@ -9,8 +9,14 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  BackHandler,
 } from 'react-native';
-import {useNavigation, useRoute, RouteProp} from '@react-navigation/native';
+import {
+  useNavigation,
+  useRoute,
+  RouteProp,
+  useFocusEffect,
+} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../App';
 import {useWorkout} from '../context/WorkoutContext';
@@ -46,20 +52,24 @@ interface ActiveTimer {
 export default function WorkoutScreen() {
   const navigation = useNavigation<WorkoutScreenNavigationProp>();
   const route = useRoute<WorkoutScreenRouteProp>();
-  const {duration, focusAreas, useAI = false} = route.params;
+  const {
+    duration,
+    focusAreas,
+    useAI = false,
+    exercises: preGeneratedExercises,
+    preGenerated = false,
+  } = route.params;
   const {
     currentWorkout,
     startWorkout,
     completeWorkout,
+    cancelWorkout,
     updateExerciseSet,
     removeExercise,
     reorderExercises,
     replaceExercise,
   } = useWorkout();
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [loadingMessage, setLoadingMessage] = useState<string>(
-    'Generating your workout...',
-  );
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null);
   const [timerUpdated, setTimerUpdated] = useState<boolean>(true);
   const [showReorderModal, setShowReorderModal] = useState<boolean>(false);
@@ -67,64 +77,127 @@ export default function WorkoutScreen() {
   const [exerciseToReplace, setExerciseToReplace] = useState<number | null>(
     null,
   );
+  const [workoutInitialized, setWorkoutInitialized] = useState(false);
+
+  // Handle back button press
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        if (currentWorkout && !currentWorkout.completed) {
+          handleBackPress();
+          return true;
+        }
+        return false;
+      };
+
+      BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () =>
+        BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+    }, [currentWorkout]),
+  );
+
+  // Override navigation back button
+  React.useLayoutEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => null, // Remove default back button
+      gestureEnabled: false, // Disable swipe back on iOS
+    });
+  }, [navigation]);
 
   useEffect(() => {
-    if (currentWorkout) {
-      setIsLoading(false);
-      return;
+    // Only initialize workout once
+    if (!workoutInitialized) {
+      initializeWorkout();
     }
-    Alert.alert('No Workout Found');
-    generateWorkoutAsync();
-  }, [currentWorkout, duration, focusAreas, useAI]);
+  }, []);
 
-  const generateWorkoutAsync = async () => {
+  const initializeWorkout = async () => {
     try {
       setIsLoading(true);
-      if (useAI) {
-        setLoadingMessage('AI is crafting your personalized workout...');
+
+      if (
+        preGenerated &&
+        preGeneratedExercises &&
+        preGeneratedExercises.length > 0
+      ) {
+        console.log(
+          'Starting workout with pre-generated exercises:',
+          preGeneratedExercises.length,
+        );
+        // Clear any existing workout and start fresh
+        await new Promise(resolve => setTimeout(resolve, 100)); // Small delay to ensure state updates
+        startWorkout(duration, preGeneratedExercises);
+        setWorkoutInitialized(true);
+      } else if (!preGenerated) {
+        // Legacy flow - generate new workout
+        const exercises = await generateWorkout(
+          duration,
+          undefined,
+          focusAreas as any,
+          useAI,
+        );
+        if (exercises && exercises.length > 0) {
+          startWorkout(duration, exercises);
+          setWorkoutInitialized(true);
+        } else {
+          throw new Error('No exercises generated');
+        }
+      } else {
+        throw new Error('No exercises provided');
       }
-
-      // Generate exercises
-      const exercises = await generateWorkout(
-        duration,
-        undefined, // TODO: Add user preferences
-        focusAreas as any,
-        useAI,
-      );
-
-      // Make sure we have exercises
-      if (!exercises || exercises.length === 0) {
-        throw new Error('No exercises generated');
-      }
-
-      // Start the workout
-      startWorkout(duration, exercises);
-      setIsLoading(false);
     } catch (error) {
-      console.error('Error generating workout:', error);
+      console.error('Error initializing workout:', error);
+      Alert.alert('Error', 'Failed to start workout. Please try again.', [
+        {text: 'OK', onPress: () => navigation.goBack()},
+      ]);
+    } finally {
       setIsLoading(false);
-      Alert.alert(
-        'Generation Failed',
-        'Failed to generate workout. Please try again.',
-        [{text: 'OK', onPress: () => navigation.goBack()}],
-      );
     }
+  };
+
+  const handleBackPress = () => {
+    Alert.alert(
+      'Exit Workout?',
+      'You have an active workout. What would you like to do?',
+      [
+        {text: 'Continue', style: 'cancel'},
+        {
+          text: 'Save & Exit',
+          onPress: handleCompleteWorkout,
+        },
+        {
+          text: 'Discard',
+          style: 'destructive',
+          onPress: handleDiscardWorkout,
+        },
+      ],
+    );
   };
 
   const handleTimerFinished = () => {
     setActiveTimer(null);
   };
 
-  const handleCompleteWorkout = () => {
+  const handleCompleteWorkout = async () => {
+    try {
+      await completeWorkout();
+      navigation.navigate('Home');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save workout');
+    }
+  };
+
+  const handleDiscardWorkout = () => {
     Alert.alert(
-      'Complete Workout',
-      'Are you sure you want to finish this workout?',
+      'Discard Workout?',
+      'Are you sure you want to discard this workout? All progress will be lost.',
       [
         {text: 'Cancel', style: 'cancel'},
         {
-          text: 'Complete',
-          onPress: async () => {
-            await completeWorkout();
+          text: 'Discard',
+          style: 'destructive',
+          onPress: () => {
+            cancelWorkout();
             navigation.navigate('Home');
           },
         },
@@ -209,22 +282,15 @@ export default function WorkoutScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.accent} />
-        <Text style={styles.loadingText}>{loadingMessage}</Text>
-        {useAI && (
-          <Text style={styles.loadingSubtext}>
-            This may take a few seconds...
-          </Text>
-        )}
+        <Text style={styles.loadingText}>Starting your workout...</Text>
       </View>
     );
   }
 
-  if (!currentWorkout) {
+  if (!currentWorkout || !workoutInitialized) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>
-          Failed to load workout. Please try again.
-        </Text>
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>No active workout</Text>
         <TouchableOpacity
           style={styles.retryButton}
           onPress={() => navigation.goBack()}>
@@ -237,14 +303,10 @@ export default function WorkoutScreen() {
   return (
     <View style={styles.container}>
       <WorkoutHeader />
-      <View
-        style={{
-          padding: 10,
-          flexDirection: 'row',
-          justifyContent: 'space-around',
-        }}>
-        <Text style={{color: colors.textPrimary}}>
-          Duration: {currentWorkout.duration} min
+      <View style={styles.infoBar}>
+        <Text style={styles.infoText}>
+          Duration: {currentWorkout.duration} min •{' '}
+          {currentWorkout.exercises.length} exercises
         </Text>
       </View>
       <ScrollView
@@ -252,7 +314,7 @@ export default function WorkoutScreen() {
         showsVerticalScrollIndicator={false}>
         {currentWorkout.exercises.map((exercise, index) => (
           <ExerciseCard
-            key={`${exercise.id}-${index}`} // Fix for duplicate key error
+            key={`${exercise.id}-${index}`}
             exercise={exercise}
             exerciseIndex={index}
             onUpdate={(setIndex, actual, weight, completed, restTime) =>
@@ -270,11 +332,27 @@ export default function WorkoutScreen() {
             onRemoveExercise={handleRemoveExercise}
           />
         ))}
-        <TouchableOpacity
-          style={styles.completeButton}
-          onPress={handleCompleteWorkout}>
-          <Text style={styles.completeButtonText}>COMPLETE WORKOUT</Text>
-        </TouchableOpacity>
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={styles.discardButton}
+            onPress={handleDiscardWorkout}>
+            <Text style={styles.discardButtonText}>Discard Workout</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.completeButton}
+            onPress={() => {
+              Alert.alert(
+                'Complete Workout',
+                'Are you sure you want to finish this workout?',
+                [
+                  {text: 'Cancel', style: 'cancel'},
+                  {text: 'Complete', onPress: handleCompleteWorkout},
+                ],
+              );
+            }}>
+            <Text style={styles.completeButtonText}>Complete Workout</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       <TimerModal
@@ -331,41 +409,68 @@ const styles = StyleSheet.create({
     marginTop: 20,
     textAlign: 'center',
   },
-  loadingSubtext: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    marginTop: 8,
-    textAlign: 'center',
+  errorContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   errorText: {
     color: colors.textSecondary,
     fontSize: 16,
     textAlign: 'center',
-    marginTop: 50,
-    paddingHorizontal: 20,
+    marginBottom: 20,
   },
   retryButton: {
     backgroundColor: colors.accent,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
-    marginTop: 20,
   },
   retryButtonText: {
     color: colors.buttonText,
     fontSize: 16,
     fontWeight: 'bold',
   },
+  infoBar: {
+    backgroundColor: colors.cardBackground,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  infoText: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    textAlign: 'center',
+  },
   scrollView: {
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 10,
   },
+  actionButtons: {
+    marginVertical: 30,
+    gap: 12,
+  },
+  discardButton: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FF3B30',
+  },
+  discardButtonText: {
+    color: '#FF3B30',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   completeButton: {
     backgroundColor: colors.accent,
     borderRadius: 12,
     paddingVertical: 16,
-    marginVertical: 30,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
@@ -377,8 +482,5 @@ const styles = StyleSheet.create({
     color: colors.buttonText,
     fontSize: 16,
     fontWeight: 'bold',
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: {width: 1, height: 1},
-    textShadowRadius: 2,
   },
 });
