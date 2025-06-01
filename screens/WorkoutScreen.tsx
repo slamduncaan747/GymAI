@@ -230,6 +230,7 @@ export default function WorkoutScreen() {
   };
 
   const handleReplaceRequest = (exerciseIndex: number) => {
+    console.log('Replace requested for exercise index:', exerciseIndex);
     setExerciseToReplace(exerciseIndex);
     setShowReplaceModal(true);
   };
@@ -263,6 +264,7 @@ export default function WorkoutScreen() {
   };
 
   const handleReplaceComplete = (newExercise: WorkoutExercise) => {
+    console.log('Replacing exercise at index:', exerciseToReplace);
     if (exerciseToReplace !== null) {
       replaceExercise(exerciseToReplace, newExercise);
     }
@@ -345,7 +347,7 @@ export default function WorkoutScreen() {
               )
             }
             onReorderRequest={handleReorderRequest}
-            onReplaceRequest={() => handleReplaceRequest(index)}
+            onReplaceRequest={handleReplaceRequest}
             onRemoveExercise={handleRemoveExercise}
           />
         ))}
@@ -395,17 +397,20 @@ export default function WorkoutScreen() {
       )}
 
       {/* Replace Modal */}
-      {showReplaceModal && exerciseToReplace !== null && (
-        <ReplaceExerciseModal
-          visible={showReplaceModal}
-          onClose={() => {
-            setShowReplaceModal(false);
-            setExerciseToReplace(null);
-          }}
-          onReplace={handleReplaceComplete}
-          currentExerciseId={currentWorkout.exercises[exerciseToReplace].id}
-        />
-      )}
+      {showReplaceModal &&
+        exerciseToReplace !== null &&
+        currentWorkout &&
+        currentWorkout.exercises[exerciseToReplace] && (
+          <ReplaceExerciseModal
+            visible={showReplaceModal}
+            onClose={() => {
+              setShowReplaceModal(false);
+              setExerciseToReplace(null);
+            }}
+            onReplace={handleReplaceComplete}
+            currentExerciseId={currentWorkout.exercises[exerciseToReplace].id}
+          />
+        )}
     </View>
   );
 }

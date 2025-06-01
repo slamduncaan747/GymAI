@@ -23,7 +23,7 @@ interface ExerciseCardProps {
     restTime?: number,
   ) => void;
   onReorderRequest?: () => void;
-  onReplaceRequest?: () => void;
+  onReplaceRequest?: (exerciseIndex: number) => void;
   onRemoveExercise?: (exerciseIndex: number) => void;
 }
 
@@ -111,7 +111,7 @@ const ExerciseCard: React.FC<ExerciseCardProps> = React.memo(
 
     const handleReplaceExercise = (): void => {
       if (onReplaceRequest) {
-        onReplaceRequest();
+        onReplaceRequest(exerciseIndex);
       }
     };
 

@@ -1,19 +1,30 @@
 export const colors = {
-  background: '#121212', // Dark charcoal for a sleek, modern background
-  textPrimary: '#ffffff', // Bright white for high contrast and readability
-  textSecondary: '#b0b0b0', // Light gray for secondary text, soft but clear
-  accent: '#ff6d00', // Vibrant orange for energy and calls to action
-  finish: '#00c4b4', // Teal for completion states, fresh and rewarding
-  border: '#2a2a2a', // Subtle dark gray for borders, clean separation
-  loading: '#ff8c00', // Warm orange for loading states, dynamic and engaging
-  buttonText: '#ffffff', // White for button text, ensuring clarity
-  cardBackground: '#1e1e1e', // Slightly lighter dark for card backgrounds
-  setRowBackground: '#2d2d2d', // Neutral dark gray for set rows
-  setRowCompleted: '#004d40', // Deep teal for completed sets, calming and distinct
-  setRowBorderCompleted: '#00c4b4', // Teal border for completed sets, matching finish
-  inputBackground: '#1e1e1e', // Dark background for inputs, consistent with cards
-  inputBorder: '#4a4a4a', // Mid-gray for input borders, subtle but defined
-  timerBackground: '#2a2a2a', // Dark gray for timer background, professional and clean
-  timerText: '#ffffff', // White for timer text, high readability
-  timerShadowColor: '#000000', // Black for timer shadow, subtle depth
+  // Backgrounds
+  background: '#121212', // Deep charcoal for sleek app background
+  cardBackground: '#1e1e1e', // Slight contrast for cards
+  setRowBackground: '#2a2a2a', // Neutral dark gray for list rows
+  setRowCompleted: '#18453B', // Spartan green for completed sets
+
+  // Text
+  textPrimary: '#ffffff', // Crisp white text
+  textSecondary: '#b0b0b0', // Muted gray for secondary text
+  buttonText: '#ffffff', // Clear button text
+  timerText: '#ffffff',
+
+  // Accents & States
+  accent: '#18453B', // Spartan green for CTAs and focus
+  finish: '#66ffcc', // Mint for success — energizing but complementary
+  loading: '#9ac59d', // Soft desaturated green
+  border: '#2e2e2e', // Subtle border contrast
+
+  // Set row border
+  setRowBorderCompleted: '#66ffcc', // Matches finish for visual feedback
+
+  // Inputs
+  inputBackground: '#1a1a1a',
+  inputBorder: '#3a3a3a',
+
+  // Timer
+  timerBackground: '#232323',
+  timerShadowColor: '#000000',
 };
