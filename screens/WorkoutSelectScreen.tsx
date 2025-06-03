@@ -8,11 +8,9 @@ import {
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
-  Switch,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
-import LinearGradient from 'react-native-linear-gradient';
 import {RootStackParamList} from '../App';
 import {colors} from '../themes/colors';
 import {Exercise} from '../types/workout';
@@ -22,184 +20,148 @@ type WorkoutSelectNavigationProp = StackNavigationProp<
   'WorkoutSelect'
 >;
 
-const DURATION_OPTIONS = [
-  {minutes: 15, label: 'Quick', description: '3-4 exercises', icon: '⚡'},
-  {minutes: 30, label: 'Standard', description: '5-6 exercises', icon: '💪'},
-  {minutes: 45, label: 'Focused', description: '7-9 exercises', icon: '🎯'},
-  {minutes: 60, label: 'Complete', description: '10-12 exercises', icon: '🔥'},
-  {minutes: 90, label: 'Extended', description: '12+ exercises', icon: '💯'},
+const TIME_OPTIONS = [
+  {minutes: 15, label: 'Quick', exercises: '3-4'},
+  {minutes: 30, label: 'Standard', exercises: '5-6'},
+  {minutes: 45, label: 'Full', exercises: '7-8'},
+  {minutes: 60, label: 'Extended', exercises: '9-10'},
 ];
 
-const MUSCLE_GROUPS: {id: Exercise['category']; label: string; icon: string}[] =
-  [
-    {id: 'chest', label: 'Chest', icon: '🏋️'},
-    {id: 'back', label: 'Back', icon: '🦾'},
-    {id: 'shoulders', label: 'Shoulders', icon: '💪'},
-    {id: 'legs', label: 'Legs', icon: '🦵'},
-    {id: 'arms', label: 'Arms', icon: '💪'},
-    {id: 'core', label: 'Core', icon: '🎯'},
-  ];
+const MUSCLE_GROUPS: {id: Exercise['category']; label: string}[] = [
+  {id: 'chest', label: 'Chest'},
+  {id: 'back', label: 'Back'},
+  {id: 'shoulders', label: 'Shoulders'},
+  {id: 'legs', label: 'Legs'},
+  {id: 'arms', label: 'Arms'},
+  {id: 'core', label: 'Core'},
+];
 
 export default function WorkoutSelectScreen() {
   const navigation = useNavigation<WorkoutSelectNavigationProp>();
-  const [selectedDuration, setSelectedDuration] = useState<number | null>(null);
-  const [selectedMuscleGroups, setSelectedMuscleGroups] = useState<
+  const [selectedTime, setSelectedTime] = useState<number>(30); // Default 30 min
+  const [selectedMuscles, setSelectedMuscles] = useState<
     Exercise['category'][]
   >([]);
-  const [useAI, setUseAI] = useState(true);
 
-  const handleDurationSelect = (duration: number) => {
-    setSelectedDuration(duration);
-  };
-
-  const toggleMuscleGroup = (group: Exercise['category']) => {
-    setSelectedMuscleGroups(prev =>
-      prev.includes(group) ? prev.filter(g => g !== group) : [...prev, group],
+  const toggleMuscle = (muscle: Exercise['category']) => {
+    setSelectedMuscles(prev =>
+      prev.includes(muscle)
+        ? prev.filter(m => m !== muscle)
+        : [...prev, muscle],
     );
   };
 
   const handleStartWorkout = () => {
-    if (!selectedDuration) return;
-
-    // Navigate to preview screen first
     navigation.navigate('WorkoutPreview', {
-      duration: selectedDuration,
-      focusAreas:
-        selectedMuscleGroups.length > 0 ? selectedMuscleGroups : undefined,
-      useAI: useAI,
+      duration: selectedTime,
+      focusAreas: selectedMuscles.length > 0 ? selectedMuscles : undefined,
+      useAI: true, // Always true
     });
   };
-
-  const isReadyToStart = selectedDuration !== null;
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}>
+        showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}>
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Create Your Workout</Text>
-          <View style={styles.placeholder} />
+          <Text style={styles.title}>New Workout</Text>
+          <Text style={styles.subtitle}>
+            AI will create your perfect workout
+          </Text>
         </View>
 
-        {/* AI Toggle */}
-        <View style={styles.aiToggleCard}>
-          <View style={styles.aiToggleContent}>
-            <Text style={styles.aiToggleIcon}>🤖</Text>
-            <View style={styles.aiToggleTextContainer}>
-              <Text style={styles.aiToggleTitle}>AI-Powered Workout</Text>
-              <Text style={styles.aiToggleSubtitle}>
-                Get personalized exercise selection
-              </Text>
-            </View>
-          </View>
-          <Switch
-            value={useAI}
-            onValueChange={setUseAI}
-            trackColor={{false: colors.inputBackground, true: colors.accent}}
-            thumbColor={colors.buttonText}
-          />
-        </View>
-
-        {/* Duration Selection */}
+        {/* Time Selector - Horizontal Pills */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Select Duration</Text>
-          <View style={styles.durationContainer}>
-            {DURATION_OPTIONS.map(option => (
+          <Text style={styles.sectionTitle}>DURATION</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.timeScroll}>
+            {TIME_OPTIONS.map(option => (
               <TouchableOpacity
                 key={option.minutes}
                 style={[
-                  styles.durationCard,
-                  selectedDuration === option.minutes &&
-                    styles.durationCardSelected,
+                  styles.timePill,
+                  selectedTime === option.minutes && styles.timePillSelected,
                 ]}
-                onPress={() => handleDurationSelect(option.minutes)}
-                activeOpacity={0.8}>
-                <Text style={styles.durationIcon}>{option.icon}</Text>
+                onPress={() => setSelectedTime(option.minutes)}
+                activeOpacity={0.7}>
                 <Text
                   style={[
-                    styles.durationNumber,
-                    selectedDuration === option.minutes &&
-                      styles.durationNumberSelected,
+                    styles.timeMinutes,
+                    selectedTime === option.minutes &&
+                      styles.timeMinutesSelected,
                   ]}>
-                  {option.minutes}
+                  {option.minutes} min
                 </Text>
                 <Text
                   style={[
-                    styles.durationLabel,
-                    selectedDuration === option.minutes &&
-                      styles.durationLabelSelected,
+                    styles.timeExercises,
+                    selectedTime === option.minutes &&
+                      styles.timeExercisesSelected,
                   ]}>
-                  {option.label}
+                  {option.exercises} exercises
                 </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Muscle Groups */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>TARGET MUSCLES</Text>
+            <Text style={styles.sectionHint}>Leave empty for full body</Text>
+          </View>
+
+          <View style={styles.muscleGrid}>
+            {MUSCLE_GROUPS.map(muscle => (
+              <TouchableOpacity
+                key={muscle.id}
+                style={[
+                  styles.muscleButton,
+                  selectedMuscles.includes(muscle.id) &&
+                    styles.muscleButtonSelected,
+                ]}
+                onPress={() => toggleMuscle(muscle.id)}
+                activeOpacity={0.7}>
                 <Text
                   style={[
-                    styles.durationDescription,
-                    selectedDuration === option.minutes &&
-                      styles.durationDescriptionSelected,
+                    styles.muscleText,
+                    selectedMuscles.includes(muscle.id) &&
+                      styles.muscleTextSelected,
                   ]}>
-                  {option.description}
+                  {muscle.label}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* Focus Areas */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Focus Areas <Text style={styles.sectionSubtitle}>(Optional)</Text>
-          </Text>
-          <View style={styles.muscleGroupContainer}>
-            {MUSCLE_GROUPS.map(group => (
-              <TouchableOpacity
-                key={group.id}
-                style={[
-                  styles.muscleGroupCard,
-                  selectedMuscleGroups.includes(group.id) &&
-                    styles.muscleGroupCardSelected,
-                ]}
-                onPress={() => toggleMuscleGroup(group.id)}
-                activeOpacity={0.8}>
-                <Text style={styles.muscleGroupIcon}>{group.icon}</Text>
-                <Text
-                  style={[
-                    styles.muscleGroupLabel,
-                    selectedMuscleGroups.includes(group.id) &&
-                      styles.muscleGroupLabelSelected,
-                  ]}>
-                  {group.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+        {/* Workout Type Info */}
+        <View style={styles.infoSection}>
+          <View style={styles.infoCard}>
+            <Text style={styles.infoTitle}>AI Optimized</Text>
+            <Text style={styles.infoText}>
+              Your workout will be personalized based on:
+            </Text>
+            <View style={styles.infoList}>
+              <Text style={styles.infoItem}>• Your workout history</Text>
+              <Text style={styles.infoItem}>• Exercise variety</Text>
+              <Text style={styles.infoItem}>• Progressive overload</Text>
+              <Text style={styles.infoItem}>• Muscle recovery</Text>
+            </View>
           </View>
         </View>
 
         {/* Start Button */}
         <TouchableOpacity
-          style={[
-            styles.startButton,
-            !isReadyToStart && styles.startButtonDisabled,
-          ]}
+          style={styles.startButton}
           onPress={handleStartWorkout}
-          disabled={!isReadyToStart}
-          activeOpacity={0.9}>
-          <View
-            style={[
-              styles.startButtonGradient,
-              !isReadyToStart && styles.startButtonGradientDisabled,
-            ]}>
-            <Text style={styles.startButtonText}>
-              {isReadyToStart ? 'Generate Workout' : 'Select Duration'}
-            </Text>
-          </View>
+          activeOpacity={0.8}>
+          <Text style={styles.startButtonText}>Generate Workout</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -214,188 +176,148 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  scrollContent: {
-    paddingBottom: 20,
-  },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  backButton: {
-    padding: 8,
-  },
-  backButtonText: {
-    fontSize: 24,
-    color: colors.accent,
-    fontWeight: 'bold',
+    paddingTop: 20,
+    paddingBottom: 24,
   },
   title: {
-    flex: 1,
-    fontSize: 24,
+    fontSize: 34,
     fontWeight: 'bold',
     color: colors.textPrimary,
-    textAlign: 'center',
+    marginBottom: 4,
   },
-  placeholder: {
-    width: 40,
+  subtitle: {
+    fontSize: 16,
+    color: colors.textSecondary,
   },
-  aiToggleCard: {
-    marginHorizontal: 20,
-    marginBottom: 24,
-    backgroundColor: colors.cardBackground,
-    borderRadius: 16,
-    padding: 16,
+  // Sections
+  section: {
+    marginBottom: 32,
+  },
+  sectionHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'baseline',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    letterSpacing: 0.5,
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  sectionHint: {
+    fontSize: 13,
+    color: colors.textTertiary,
+  },
+  // Time Pills
+  timeScroll: {
+    paddingHorizontal: 20,
+  },
+  timePill: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    alignItems: 'center',
+  },
+  timePillSelected: {
+    borderColor: colors.accent,
+    backgroundColor: colors.cardBackgroundSecondary,
+  },
+  timeMinutes: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  timeMinutesSelected: {
+    color: colors.accent,
+  },
+  timeExercises: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  timeExercisesSelected: {
+    color: colors.textPrimary,
+  },
+  // Muscle Groups
+  muscleGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  muscleButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: colors.cardBackground,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  aiToggleContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  aiToggleIcon: {
-    fontSize: 28,
-    marginRight: 12,
-  },
-  aiToggleTextContainer: {
-    flex: 1,
-  },
-  aiToggleTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 2,
-  },
-  aiToggleSubtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  section: {
-    paddingHorizontal: 20,
-    marginBottom: 32,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-    marginBottom: 16,
-  },
-  sectionSubtitle: {
-    fontSize: 16,
-    fontWeight: 'normal',
-    color: colors.textSecondary,
-  },
-  durationContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  durationCard: {
-    width: '31%',
-    backgroundColor: colors.cardBackground,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  durationCardSelected: {
-    borderColor: colors.accent,
-    backgroundColor: colors.cardBackground,
-  },
-  durationIcon: {
-    fontSize: 28,
-    marginBottom: 8,
-  },
-  durationNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-    marginBottom: 4,
-  },
-  durationNumberSelected: {
-    color: colors.accent,
-  },
-  durationLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 2,
-  },
-  durationLabelSelected: {
-    color: colors.accent,
-  },
-  durationDescription: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  durationDescriptionSelected: {
-    color: colors.textSecondary,
-  },
-  muscleGroupContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  muscleGroupCard: {
-    width: '31%',
-    backgroundColor: colors.cardBackground,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  muscleGroupCardSelected: {
+  muscleButtonSelected: {
+    backgroundColor: colors.accent,
     borderColor: colors.accent,
   },
-  muscleGroupIcon: {
-    fontSize: 24,
-    marginBottom: 4,
-  },
-  muscleGroupLabel: {
-    fontSize: 14,
+  muscleText: {
+    fontSize: 15,
     fontWeight: '500',
     color: colors.textPrimary,
   },
-  muscleGroupLabelSelected: {
+  muscleTextSelected: {
+    color: colors.buttonText,
+  },
+  // Info Section
+  infoSection: {
+    paddingHorizontal: 20,
+    marginBottom: 32,
+  },
+  infoCard: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 12,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontWeight: '600',
     color: colors.accent,
+    marginBottom: 8,
   },
+  infoText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 12,
+  },
+  infoList: {
+    gap: 4,
+  },
+  infoItem: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 20,
+  },
+  // Start Button
   startButton: {
-    marginHorizontal: 20,
-    marginTop: 8,
-    borderRadius: 16,
-    overflow: 'hidden',
-    elevation: 4,
-    shadowColor: colors.accent,
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  startButtonDisabled: {
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-  startButtonGradient: {
     backgroundColor: colors.accent,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 12,
     paddingVertical: 18,
     alignItems: 'center',
   },
-  startButtonGradientDisabled: {
-    backgroundColor: colors.inputBackground,
-  },
   startButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '600',
     color: colors.buttonText,
-    letterSpacing: 0.5,
   },
 });

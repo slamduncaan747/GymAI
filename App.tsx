@@ -15,7 +15,7 @@ import SettingsScreen from './screens/SettingsScreen';
 import ExercisePreviewScreen from './components/workout/ExercisePreviewScreen';
 import {WorkoutExercise, Workout} from './types/workout';
 import {colors} from './themes/colors';
-import {Text} from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 export type RootStackParamList = {
   MainTabs: undefined;
@@ -52,15 +52,6 @@ export type TabParamList = {
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
 
-// Use the actual screens
-function ProgressScreen() {
-  return <HomeScreen />;
-}
-
-function ProfileScreen() {
-  return <SettingsScreen />;
-}
-
 function MainTabs() {
   return (
     <Tab.Navigator
@@ -68,17 +59,17 @@ function MainTabs() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.cardBackground,
-          borderTopColor: colors.border,
+          backgroundColor: colors.tabBarBackground,
+          borderTopColor: colors.tabBarBorder,
           borderTopWidth: 1,
-          paddingBottom: 8,
-          paddingTop: 8,
-          height: 80,
+          paddingBottom: 5,
+          paddingTop: 5,
+          height: 88,
         },
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.textSecondary,
+        tabBarActiveTintColor: colors.tabIconActive,
+        tabBarInactiveTintColor: colors.tabIconInactive,
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: '600',
           marginTop: 4,
         },
@@ -89,16 +80,16 @@ function MainTabs() {
         options={{
           tabBarLabel: 'Workout',
           tabBarIcon: ({color, size}) => (
-            <Text style={{fontSize: size, color}}>💪</Text>
+            <Icon name="barbell" size={26} color={color} />
           ),
         }}
       />
       <Tab.Screen
         name="Progress"
-        component={ProgressScreen}
+        component={HomeScreen}
         options={{
           tabBarIcon: ({color, size}) => (
-            <Text style={{fontSize: size, color}}>📊</Text>
+            <Icon name="trending-up" size={26} color={color} />
           ),
         }}
       />
@@ -107,16 +98,16 @@ function MainTabs() {
         component={HistoryScreen}
         options={{
           tabBarIcon: ({color, size}) => (
-            <Text style={{fontSize: size, color}}>📅</Text>
+            <Icon name="calendar" size={26} color={color} />
           ),
         }}
       />
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
+        component={SettingsScreen}
         options={{
           tabBarIcon: ({color, size}) => (
-            <Text style={{fontSize: size, color}}>👤</Text>
+            <Icon name="person" size={26} color={color} />
           ),
         }}
       />

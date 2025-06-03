@@ -5,7 +5,15 @@ import {exerciseService} from '../service/exerciseService';
 import {createOpenAIService} from '../service/openAIService';
 import {OPENAI_API_KEY} from '../config/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {Alert} from 'react-native';
+
+// REALISTIC exercise counts based on time
+const EXERCISE_COUNT_BY_DURATION: {[key: number]: number} = {
+  15: 4, // 3-4 exercises for 15 min
+  30: 6, // 5-6 exercises for 30 min
+  45: 8, // 7-8 exercises for 45 min
+  60: 10, // 9-10 exercises for 60 min
+  90: 12, // 11-12 exercises for 90 min
+};
 
 // Default user preferences if none are set
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -19,16 +27,20 @@ export async function generateWorkout(
   duration: number,
   userPreferences?: UserPreferences,
   focusAreas?: Exercise['category'][],
-  useAI: boolean = false,
+  useAI: boolean = true, // Default to true since AI is always on
   feedback?: string,
   currentExercises?: WorkoutExercise[],
 ): Promise<WorkoutExercise[]> {
   const preferences = userPreferences || DEFAULT_PREFERENCES;
 
-  // If AI is requested and we have an API key, use AI generation
+  // Get exact exercise count based on duration
+  const targetExerciseCount =
+    EXERCISE_COUNT_BY_DURATION[duration] ||
+    Math.min(Math.floor(duration / 7), 12); // Fallback: ~7 minutes per exercise, max 12
+
+  // Always try AI first
   if (useAI) {
     try {
-      // First check if we have a stored API key
       const storedKey = await AsyncStorage.getItem('openai_api_key');
       const apiKey = storedKey || OPENAI_API_KEY;
 
@@ -41,9 +53,14 @@ export async function generateWorkout(
           recentExerciseIds: await getRecentExerciseIds(),
           feedback,
           currentExercises,
+          targetExerciseCount, // Pass the exact count to AI
         });
+
+        // Ensure AI returns correct number of exercises
         if (aiWorkout.length > 0) {
-          return aiWorkout;
+          // Trim if too many, or use as is if within range
+          const trimmedWorkout = aiWorkout.slice(0, targetExerciseCount);
+          return trimmedWorkout;
         }
       }
     } catch (error) {
@@ -51,8 +68,13 @@ export async function generateWorkout(
     }
   }
 
-  // Always fall back to standard generation
-  return exerciseService.generateWorkout(duration, preferences, focusAreas);
+  // Fallback to standard generation with exact count
+  return exerciseService.generateWorkout(
+    duration,
+    preferences,
+    focusAreas,
+    targetExerciseCount, // Pass exact count
+  );
 }
 
 // Get recently used exercise IDs to avoid repetition
@@ -88,7 +110,13 @@ export function generateQuickWorkout(
     availableEquipment: equipment,
   };
 
-  return exerciseService.generateWorkout(duration, preferences);
+  const targetExerciseCount = EXERCISE_COUNT_BY_DURATION[duration] || 6;
+  return exerciseService.generateWorkout(
+    duration,
+    preferences,
+    undefined,
+    targetExerciseCount,
+  );
 }
 
 // Generate a workout focusing on specific muscle groups
@@ -98,8 +126,14 @@ export function generateTargetedWorkout(
   userPreferences?: UserPreferences,
 ): WorkoutExercise[] {
   const preferences = userPreferences || DEFAULT_PREFERENCES;
+  const targetExerciseCount = EXERCISE_COUNT_BY_DURATION[duration] || 6;
 
-  return exerciseService.generateWorkout(duration, preferences, targetAreas);
+  return exerciseService.generateWorkout(
+    duration,
+    preferences,
+    targetAreas,
+    targetExerciseCount,
+  );
 }
 
 // Generate a workout based on user's recent activity to ensure variety
@@ -109,6 +143,7 @@ export async function generateVariedWorkout(
 ): Promise<WorkoutExercise[]> {
   const preferences = userPreferences || DEFAULT_PREFERENCES;
   const recentExerciseIds = await getRecentExerciseIds();
+  const targetExerciseCount = EXERCISE_COUNT_BY_DURATION[duration] || 6;
 
   // Get all suitable exercises
   const suitableExercises = exerciseService.getExercisesForUser(preferences);
@@ -120,20 +155,19 @@ export async function generateVariedWorkout(
 
   // If we filtered out too many, add some back
   const exercisesToUse =
-    freshExercises.length >= 10
+    freshExercises.length >= targetExerciseCount * 2
       ? freshExercises
       : [
           ...freshExercises,
           ...suitableExercises
             .filter(ex => recentExerciseIds.includes(ex.id))
-            .slice(0, 5),
+            .slice(0, targetExerciseCount / 2),
         ];
 
   // Generate workout from this filtered set
-  const exerciseCount = Math.max(3, Math.floor(duration / 5));
   const selected = exercisesToUse
     .sort(() => Math.random() - 0.5)
-    .slice(0, exerciseCount);
+    .slice(0, targetExerciseCount);
 
   return selected.map(ex => exerciseService.toWorkoutExercise(ex));
 }

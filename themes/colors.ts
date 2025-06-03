@@ -1,30 +1,47 @@
+// themes/colors.ts
 export const colors = {
-  // Backgrounds
-  background: '#121212', // Deep charcoal for sleek app background
-  cardBackground: '#1e1e1e', // Slight contrast for cards
-  setRowBackground: '#2a2a2a', // Neutral dark gray for list rows
-  setRowCompleted: '#18453B', // Spartan green for completed sets
+  // Backgrounds - Hevy uses pure blacks
+  background: '#000000', // Pure black
+  cardBackground: '#0A0A0A', // Very subtle gray
+  cardBackgroundSecondary: '#111111', // Slightly lighter
+  setRowBackground: '#000000', // Match background
+  setRowCompleted: '#0A1A0A', // Very subtle green tint
 
-  // Text
-  textPrimary: '#ffffff', // Crisp white text
-  textSecondary: '#b0b0b0', // Muted gray for secondary text
-  buttonText: '#ffffff', // Clear button text
-  timerText: '#ffffff',
+  // Text - High contrast
+  textPrimary: '#FFFFFF', // Pure white
+  textSecondary: '#999999', // Hevy's gray
+  textTertiary: '#666666', // Even lighter
+  buttonText: '#000000', // Black on green buttons
+  timerText: '#FFFFFF',
 
-  // Accents & States
-  accent: '#18453B', // Spartan green for CTAs and focus
-  finish: '#66ffcc', // Mint for success — energizing but complementary
-  loading: '#9ac59d', // Soft desaturated green
-  border: '#2e2e2e', // Subtle border contrast
+  // Accent - Hevy's green
+  accent: '#4CD964', // Hevy green
+  accentSecondary: '#3FB351', // Darker green
+  accentDim: 'rgba(76, 217, 100, 0.1)', // Very subtle green
 
-  // Set row border
-  setRowBorderCompleted: '#66ffcc', // Matches finish for visual feedback
+  // Status
+  success: '#4CD964',
+  warning: '#FF9500',
+  danger: '#FF3B30',
+
+  // Borders - Almost invisible
+  border: '#1C1C1C', // Very subtle
+  borderLight: '#2C2C2C',
+  setRowBorderCompleted: '#4CD964',
 
   // Inputs
-  inputBackground: '#1a1a1a',
-  inputBorder: '#3a3a3a',
+  inputBackground: '#1C1C1C',
+  inputBorder: '#2C2C2C',
 
-  // Timer
-  timerBackground: '#232323',
+  // Special
+  timerBackground: '#1C1C1C',
   timerShadowColor: '#000000',
+  tabBarBackground: '#000000',
+  tabBarBorder: '#1C1C1C',
+  tabIconActive: '#4CD964',
+  tabIconInactive: '#666666',
+
+  // Remove old
+  finish: '#4CD964',
+  loading: 'rgba(76, 217, 100, 0.5)',
 };
