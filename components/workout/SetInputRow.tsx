@@ -1,16 +1,17 @@
-import React, {useState, useCallback, useEffect} from 'react';
+// components/workout/SetInputRow.tsx (Redesigned)
+import React, {useState, useCallback, useEffect, useRef} from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  Animated,
 } from 'react-native';
 import {WorkoutSet} from '../../types/workout';
-import {colors} from '../../themes/colors';
+import {colors, typography, spacing} from '../../themes';
 import {debounce} from 'lodash';
 
-// Define interfaces for props and styles
 interface SetInputRowProps {
   setNumber: number;
   set: WorkoutSet;
@@ -21,15 +22,16 @@ interface SetInputRowProps {
 
 const SetInputRow: React.FC<SetInputRowProps> = React.memo(
   ({setNumber, set, onUpdate, previousSet, restTime = 60}) => {
-    const [weight, setWeight] = useState<string>(
+    const [weight, setWeight] = useState(
       set.weight > 0 ? set.weight.toString() : '',
     );
-    const [reps, setReps] = useState<string>(
+    const [reps, setReps] = useState(
       set.actual > 0 ? set.actual.toString() : '',
     );
-    const [isCompleted, setIsCompleted] = useState<boolean>(
-      set.completed || false,
-    );
+    const [isCompleted, setIsCompleted] = useState(set.completed || false);
+    const checkmarkScale = useRef(
+      new Animated.Value(isCompleted ? 1 : 0),
+    ).current;
 
     const debouncedUpdate = useCallback(
       debounce((actual: number, weight: number, completed: boolean) => {
@@ -44,7 +46,16 @@ const SetInputRow: React.FC<SetInputRowProps> = React.memo(
       setIsCompleted(set.completed || false);
     }, [set]);
 
-    const handleWeightChange = (value: string): void => {
+    useEffect(() => {
+      Animated.spring(checkmarkScale, {
+        toValue: isCompleted ? 1 : 0,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 7,
+      }).start();
+    }, [isCompleted]);
+
+    const handleWeightChange = (value: string) => {
       const cleanValue = value.replace(/[^0-9.]/g, '');
       setWeight(cleanValue);
       const numValue = parseFloat(cleanValue) || 0;
@@ -53,7 +64,7 @@ const SetInputRow: React.FC<SetInputRowProps> = React.memo(
       }
     };
 
-    const handleRepsChange = (value: string): void => {
+    const handleRepsChange = (value: string) => {
       const cleanValue = value.replace(/[^0-9]/g, '');
       setReps(cleanValue);
       const numValue = parseInt(cleanValue) || 0;
@@ -62,13 +73,11 @@ const SetInputRow: React.FC<SetInputRowProps> = React.memo(
       }
     };
 
-    const handleComplete = (): void => {
+    const handleComplete = () => {
       if (isCompleted) {
-        // Uncomplete the set
         setIsCompleted(false);
         debouncedUpdate(0, parseFloat(weight) || 0, false);
       } else {
-        // Complete the set
         const currentWeight = parseFloat(weight) || set.weight || 0;
         const currentReps = parseInt(reps) || set.target || 0;
 
@@ -77,17 +86,15 @@ const SetInputRow: React.FC<SetInputRowProps> = React.memo(
         setWeight(currentWeight.toString());
         setReps(currentReps.toString());
         setIsCompleted(true);
-
-        // Update with completed status - the timer will be handled by parent
         debouncedUpdate(currentReps, currentWeight, true);
       }
     };
 
-    const getPreviousData = (): string => {
+    const getPreviousData = () => {
       if (previousSet && previousSet.weight > 0 && previousSet.actual > 0) {
         return `${previousSet.weight} × ${previousSet.actual}`;
       }
-      return '---';
+      return '—';
     };
 
     return (
@@ -101,26 +108,26 @@ const SetInputRow: React.FC<SetInputRowProps> = React.memo(
           <Text style={styles.previousText}>{getPreviousData()}</Text>
         </View>
 
-        <View style={styles.weightContainer}>
+        <View style={styles.inputContainer}>
           <TextInput
             style={[styles.input, isCompleted && styles.inputCompleted]}
             value={weight}
             onChangeText={handleWeightChange}
             placeholder="0"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textTertiary}
             keyboardType="decimal-pad"
             selectTextOnFocus
             editable={true}
           />
         </View>
 
-        <View style={styles.repsContainer}>
+        <View style={styles.inputContainer}>
           <TextInput
             style={[styles.input, isCompleted && styles.inputCompleted]}
             value={reps}
             onChangeText={handleRepsChange}
             placeholder={set.target > 0 ? set.target.toString() : '0'}
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textTertiary}
             keyboardType="number-pad"
             selectTextOnFocus
             editable={true}
@@ -129,116 +136,89 @@ const SetInputRow: React.FC<SetInputRowProps> = React.memo(
 
         <TouchableOpacity
           style={[styles.completeButton, isCompleted && styles.completedButton]}
-          onPress={handleComplete}>
-          <Text
-            style={[
-              styles.completeButtonText,
-              isCompleted && styles.completedButtonText,
-            ]}>
-            ✓
-          </Text>
+          onPress={handleComplete}
+          activeOpacity={0.7}>
+          <Animated.View
+            style={{
+              transform: [{scale: checkmarkScale}],
+            }}>
+            <Text style={styles.checkmark}>✓</Text>
+          </Animated.View>
         </TouchableOpacity>
       </View>
     );
   },
 );
 
-// Define style types
-interface Styles {
-  container: object;
-  completedContainer: object;
-  setNumberContainer: object;
-  setNumber: object;
-  previousContainer: object;
-  previousText: object;
-  weightContainer: object;
-  repsContainer: object;
-  input: object;
-  inputCompleted: object;
-  completeButton: object;
-  completedButton: object;
-  completeButtonText: object;
-  completedButtonText: object;
-}
-
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.setRowBackground,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    minHeight: 48,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.background + '30',
   },
   completedContainer: {
-    backgroundColor: colors.setRowCompleted,
+    backgroundColor: colors.primary + '10',
   },
   setNumberContainer: {
-    width: 32,
+    width: 40,
     alignItems: 'center',
   },
   setNumber: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold,
+    color: colors.textSecondary,
   },
   previousContainer: {
     flex: 1,
     alignItems: 'center',
-    paddingHorizontal: 12,
   },
   previousText: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: typography.sizes.sm,
+    color: colors.textTertiary,
+    fontWeight: typography.weights.medium,
   },
-  weightContainer: {
+  inputContainer: {
     flex: 1,
-    paddingHorizontal: 8,
-  },
-  repsContainer: {
-    flex: 0.8,
-    paddingHorizontal: 8,
+    paddingHorizontal: spacing.xs,
   },
   input: {
     backgroundColor: colors.inputBackground,
+    borderRadius: 12,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold,
     color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '600',
     textAlign: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.inputBorder,
   },
   inputCompleted: {
-    backgroundColor: 'transparent',
-    borderColor: colors.setRowBorderCompleted,
-    color: colors.accent,
+    backgroundColor: colors.primary + '20',
+    borderColor: colors.primary,
+    color: colors.primary,
   },
   completeButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: colors.inputBackground,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
+    marginLeft: spacing.sm,
+    borderWidth: 2,
     borderColor: colors.inputBorder,
-    marginLeft: 12,
   },
   completedButton: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
-  completeButtonText: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  completedButtonText: {
-    color: colors.buttonText,
+  checkmark: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: typography.weights.bold,
   },
 });
 

@@ -1,5 +1,15 @@
-import React, {useState} from 'react';
-import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
+// components/workout/ExerciseCard.tsx (Redesigned)
+import React, {useState, useRef, useEffect} from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Animated,
+  LayoutAnimation,
+  Platform,
+  UIManager,
+} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../../App';
@@ -8,7 +18,16 @@ import {useWorkout} from '../../context/WorkoutContext';
 import SwipeableSetRow from './SwipableSetRow';
 import RestTimeModal from './RestTimeModal';
 import ExerciseOptionsModal from './ExerciseOptionsModal';
-import {colors} from '../../themes/colors';
+import Card from '../common/Card';
+import {colors, typography, spacing, shadows} from '../../themes';
+
+// Enable LayoutAnimation on Android
+if (
+  Platform.OS === 'android' &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 type ExerciseCardNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -43,16 +62,19 @@ const ExerciseCard: React.FC<ExerciseCardProps> = React.memo(
       removeSetFromExercise,
       updateExerciseRestTime,
     } = useWorkout();
-    const [showRestModal, setShowRestModal] = useState<boolean>(false);
-    const [showOptionsModal, setShowOptionsModal] = useState<boolean>(false);
-    const [restTime, setRestTime] = useState<number>(exercise.restTime || 60);
+
+    const [showRestModal, setShowRestModal] = useState(false);
+    const [showOptionsModal, setShowOptionsModal] = useState(false);
+    const [restTime, setRestTime] = useState(exercise.restTime || 60);
+    const [isExpanded, setIsExpanded] = useState(true);
+    const rotateAnim = useRef(new Animated.Value(1)).current;
 
     const handleSetUpdate = (
       setIndex: number,
       actual: number,
       weight: number,
       completed: boolean = false,
-    ): void => {
+    ) => {
       updateExerciseSet(exerciseIndex, setIndex, actual, weight, completed);
       if (onUpdate) {
         onUpdate(
@@ -65,125 +87,167 @@ const ExerciseCard: React.FC<ExerciseCardProps> = React.memo(
       }
     };
 
-    const addSet = (): void => {
-      const lastSet: WorkoutSet | undefined =
-        exercise.sets[exercise.sets.length - 1];
+    const addSet = () => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      const lastSet = exercise.sets[exercise.sets.length - 1];
       const newSet: WorkoutSet = {
         target: lastSet?.target || exercise.targetReps || 8,
         actual: 0,
         weight: lastSet?.weight || 0,
         completed: false,
       };
-
       addSetToExercise(exerciseIndex, newSet);
     };
 
-    const formatRestTime = (seconds: number): string => {
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      if (mins === 0) {
-        return `${secs}s`;
-      } else if (secs === 0) {
-        return `${mins}min`;
-      } else {
-        return `${mins}min ${secs}s`;
-      }
+    const toggleExpanded = () => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setIsExpanded(!isExpanded);
+
+      Animated.timing(rotateAnim, {
+        toValue: isExpanded ? 0 : 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
     };
 
-    const handleSetDelete = (setIndex: number): void => {
+    const formatRestTime = (seconds: number) => {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return mins === 0
+        ? `${secs}s`
+        : secs === 0
+        ? `${mins}min`
+        : `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    const handleSetDelete = (setIndex: number) => {
       if (exercise.sets.length > 1) {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         removeSetFromExercise(exerciseIndex, setIndex);
       }
     };
 
-    const handleExerciseNamePress = (): void => {
+    const handleExerciseNamePress = () => {
       navigation.navigate('ExercisePreview', {
         exerciseName: exercise.name,
         exerciseId: exercise.id,
       });
     };
 
-    const handleReorderExercises = (): void => {
-      if (onReorderRequest) {
-        onReorderRequest();
-      }
-    };
-
-    const handleReplaceExercise = (): void => {
-      if (onReplaceRequest) {
-        onReplaceRequest(exerciseIndex);
-      }
-    };
-
-    const handleRemoveExercise = (): void => {
-      if (onRemoveExercise) {
-        onRemoveExercise(exerciseIndex);
-      }
-    };
-
-    const handleRestTimeChange = (time: number): void => {
+    const handleRestTimeChange = (time: number) => {
       setRestTime(time);
       updateExerciseRestTime(exerciseIndex, time);
     };
 
+    const completedSets = exercise.sets.filter(set => set.completed).length;
+    const totalSets = exercise.sets.length;
+    const progress = totalSets > 0 ? completedSets / totalSets : 0;
+
+    const spin = rotateAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '180deg'],
+    });
+
     return (
-      <View style={styles.card}>
-        <View style={styles.exerciseHeader}>
-          <View style={styles.exerciseInfo}>
-            <TouchableOpacity onPress={handleExerciseNamePress}>
-              <Text style={styles.exerciseName}>{exercise.name}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.restTimeButton}
-              onPress={() => setShowRestModal(true)}>
-              <Text style={styles.restTimeText}>
-                Rest Timer: {formatRestTime(restTime)}
-              </Text>
-            </TouchableOpacity>
-          </View>
+      <Card style={styles.card} noPadding variant="elevated">
+        {/* Header */}
+        <View style={styles.header}>
           <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => setShowOptionsModal(true)}>
-            <Text style={styles.menuText}>⋯</Text>
+            style={styles.headerLeft}
+            onPress={toggleExpanded}
+            activeOpacity={0.7}>
+            <View style={styles.exerciseNumber}>
+              <Text style={styles.exerciseNumberText}>{exerciseIndex + 1}</Text>
+            </View>
+            <View style={styles.exerciseInfo}>
+              <TouchableOpacity
+                onPress={handleExerciseNamePress}
+                activeOpacity={0.7}>
+                <Text style={styles.exerciseName}>{exercise.name}</Text>
+              </TouchableOpacity>
+              <View style={styles.exerciseStats}>
+                <Text style={styles.setCount}>
+                  {completedSets}/{totalSets} sets
+                </Text>
+                <View style={styles.dot} />
+                <TouchableOpacity
+                  onPress={() => setShowRestModal(true)}
+                  activeOpacity={0.7}>
+                  <Text style={styles.restTime}>
+                    Rest: {formatRestTime(restTime)}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </TouchableOpacity>
-        </View>
 
-        <View style={styles.setsContainer}>
-          <View style={styles.headerRow}>
-            <Text style={[styles.headerText, {width: 32}]}>SET</Text>
-            <Text style={[styles.headerText, {flex: 1, paddingHorizontal: 12}]}>
-              PREVIOUS
-            </Text>
-            <Text style={[styles.headerText, {flex: 1, paddingHorizontal: 8}]}>
-              LBS
-            </Text>
-            <Text
-              style={[styles.headerText, {flex: 0.8, paddingHorizontal: 8}]}>
-              REPS
-            </Text>
-            <Text style={[styles.headerText, {width: 40}]}></Text>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={styles.menuButton}
+              onPress={() => setShowOptionsModal(true)}
+              activeOpacity={0.7}>
+              <Text style={styles.menuIcon}>⋯</Text>
+            </TouchableOpacity>
+            <Animated.View style={{transform: [{rotate: spin}]}}>
+              <TouchableOpacity
+                style={styles.expandButton}
+                onPress={toggleExpanded}
+                activeOpacity={0.7}>
+                <Text style={styles.expandIcon}>⌄</Text>
+              </TouchableOpacity>
+            </Animated.View>
           </View>
-
-          {exercise.sets.map((set: WorkoutSet, index: number) => (
-            <SwipeableSetRow
-              key={index}
-              setNumber={index + 1}
-              set={set}
-              onUpdate={(actual: number, weight: number, completed: boolean) =>
-                handleSetUpdate(index, actual, weight, completed)
-              }
-              onDelete={() => handleSetDelete(index)}
-              previousSet={index > 0 ? exercise.sets[index - 1] : undefined}
-              restTime={restTime}
-              canDelete={exercise.sets.length > 1}
-            />
-          ))}
-
-          <TouchableOpacity style={styles.addSetButton} onPress={addSet}>
-            <Text style={styles.addSetText}>+ Add Set</Text>
-          </TouchableOpacity>
         </View>
 
+        {/* Progress Bar */}
+        <View style={styles.progressContainer}>
+          <View style={styles.progressBar}>
+            <Animated.View
+              style={[
+                styles.progressFill,
+                {
+                  width: `${progress * 100}%`,
+                },
+              ]}
+            />
+          </View>
+        </View>
+
+        {/* Sets */}
+        {isExpanded && (
+          <View style={styles.setsContainer}>
+            <View style={styles.setsHeader}>
+              <Text style={[styles.headerText, {flex: 1}]}>WEIGHT</Text>
+              <Text style={[styles.headerText, {flex: 0.8}]}>REPS</Text>
+              <View style={{width: 40}} />
+            </View>
+
+            {exercise.sets.map((set, index) => (
+              <SwipeableSetRow
+                key={index}
+                setNumber={index + 1}
+                set={set}
+                onUpdate={(actual, weight, completed) =>
+                  handleSetUpdate(index, actual, weight, completed)
+                }
+                onDelete={() => handleSetDelete(index)}
+                previousSet={index > 0 ? exercise.sets[index - 1] : undefined}
+                restTime={restTime}
+                canDelete={exercise.sets.length > 1}
+              />
+            ))}
+
+            <TouchableOpacity
+              style={styles.addSetButton}
+              onPress={addSet}
+              activeOpacity={0.7}>
+              <Text style={styles.addSetIcon}>+</Text>
+              <Text style={styles.addSetText}>Add Set</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Modals */}
         <RestTimeModal
           visible={showRestModal}
           onClose={() => setShowRestModal(false)}
@@ -196,99 +260,146 @@ const ExerciseCard: React.FC<ExerciseCardProps> = React.memo(
           visible={showOptionsModal}
           onClose={() => setShowOptionsModal(false)}
           exerciseName={exercise.name}
-          onReorder={handleReorderExercises}
-          onReplace={handleReplaceExercise}
-          onRemove={handleRemoveExercise}
+          onReorder={onReorderRequest || (() => {})}
+          onReplace={() => onReplaceRequest?.(exerciseIndex)}
+          onRemove={() => onRemoveExercise?.(exerciseIndex)}
         />
-      </View>
+      </Card>
     );
   },
 );
 
-export default ExerciseCard;
-
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: 12,
-    marginVertical: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
+    marginBottom: spacing.md,
+    overflow: 'visible',
   },
-  exerciseHeader: {
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    padding: spacing.md,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  exerciseNumber: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  exerciseNumberText: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold,
+    color: colors.primary,
   },
   exerciseInfo: {
     flex: 1,
   },
   exerciseName: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.semibold,
     color: colors.textPrimary,
-    marginBottom: 6,
-    textDecorationLine: 'underline',
+    marginBottom: spacing.xs,
   },
-  restTimeButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: colors.inputBackground,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    alignSelf: 'flex-start',
-  },
-  restTimeText: {
-    fontSize: 14,
-    color: colors.accent,
-    fontWeight: '500',
-  },
-  menuButton: {
-    padding: 8,
-    borderRadius: 8,
-  },
-  menuText: {
-    fontSize: 18,
-    color: colors.textSecondary,
-    fontWeight: 'bold',
-  },
-  setsContainer: {
-    paddingBottom: 12,
-  },
-  headerRow: {
+  exerciseStats: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+  },
+  setCount: {
+    fontSize: typography.sizes.sm,
+    color: colors.textSecondary,
+  },
+  dot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.textTertiary,
+    marginHorizontal: spacing.sm,
+  },
+  restTime: {
+    fontSize: typography.sizes.sm,
+    color: colors.primary,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  menuButton: {
+    padding: spacing.sm,
+    marginRight: spacing.xs,
+  },
+  menuIcon: {
+    fontSize: 20,
+    color: colors.textSecondary,
+    fontWeight: typography.weights.bold,
+  },
+  expandButton: {
+    padding: spacing.sm,
+  },
+  expandIcon: {
+    fontSize: 20,
+    color: colors.textSecondary,
+    fontWeight: typography.weights.bold,
+  },
+  progressContainer: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: colors.border,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: 2,
+  },
+  setsContainer: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  setsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.background + '50',
   },
   headerText: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold,
+    color: colors.textTertiary,
     textAlign: 'center',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   addSetButton: {
-    alignSelf: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    marginTop: 12,
-    marginBottom: 4,
-    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  addSetIcon: {
+    fontSize: 20,
+    color: colors.primary,
+    marginRight: spacing.sm,
+    fontWeight: typography.weights.bold,
   },
   addSetText: {
-    color: colors.accent,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold,
+    color: colors.primary,
   },
 });
+
+export default ExerciseCard;

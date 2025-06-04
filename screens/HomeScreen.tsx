@@ -1,6 +1,5 @@
-// screens/HomeScreen.tsx (Progress Tab)
-
-import React, {useEffect, useState} from 'react';
+// screens/HomeScreen.tsx (Redesigned)
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,14 +7,18 @@ import {
   ScrollView,
   SafeAreaView,
   TouchableOpacity,
+  Dimensions,
 } from 'react-native';
-import {useWorkout} from '../context/WorkoutContext';
-import {colors} from '../themes/colors';
+import LinearGradient from 'react-native-linear-gradient';
+import { useWorkout } from '../context/WorkoutContext';
+import { colors, typography, spacing, shadows } from '../themes';
+import Card from '../components/common/Card';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Icon from 'react-native-vector-icons/Ionicons';
+
+const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
-  const {loadSavedWorkouts, savedWorkouts} = useWorkout();
+  const { loadSavedWorkouts, savedWorkouts } = useWorkout();
   const [userName, setUserName] = useState('');
 
   useEffect(() => {
@@ -32,47 +35,247 @@ export default function HomeScreen() {
     }
   };
 
-  const getThisWeekWorkouts = () => {
-    const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    return savedWorkouts.filter(workout => workout.timestamp > oneWeekAgo)
-      .length;
+  const stats = {
+    totalWorkouts: savedWorkouts.length,
+    thisWeek: savedWorkouts.filter(
+      w => w.timestamp > Date.now() - 7 * 24 * 60 * 60 * 1000
+    ).length,
+    totalVolume: savedWorkouts.reduce((total, workout) => {
+      return total + workout.exercises.reduce((workoutTotal, exercise) => {
+        return workoutTotal + exercise.sets.reduce((setTotal, set) => {
+          return setTotal + (set.weight * set.actual || 0);
+        }, 0);
+      }, 0);
+    }, 0),
+    streak: calculateStreak(savedWorkouts),
   };
 
-  const getTotalVolume = () => {
-    return savedWorkouts.reduce((total, workout) => {
-      return (
-        total +
-        workout.exercises.reduce((workoutTotal, exercise) => {
-          return (
-            workoutTotal +
-            exercise.sets.reduce((setTotal, set) => {
-              return setTotal + (set.weight * set.actual || 0);
-            }, 0)
-          );
-        }, 0)
-      );
-    }, 0);
+  function calculateStreak(workouts: any[]) {
+    if (workouts.length === 0) return 0;
+    
+    const sortedWorkouts = [...workouts].sort((a, b) => b.timestamp - a.timestamp);
+    let streak = 0;
+    let currentDate = new Date();
+    
+    for (const workout of sortedWorkouts) {
+      const workoutDate = new Date(workout.timestamp);
+      const dayDiff = Math.floor((currentDate.getTime() - workoutDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (dayDiff <= streak + 1) {
+        streak = dayDiff + 1;
+      } else {
+        break;
+      }
+    }
+    
+    return streak;
+  }
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 18) return 'Good Afternoon';
+    return 'Good Evening';
   };
 
-  const getWeeklyStreak = () => {
-    // Simple streak calculation
-    const weeks = Math.floor(savedWorkouts.length / 3); // Rough estimate
-    return Math.max(0, weeks);
+  const getMotivationalQuote = () => {
+    const quotes = [
+      "Every rep counts",
+      "Stronger than yesterday",
+      "Progress, not perfection",
+      "Crush your goals",
+      "Stay consistent",
+    ];
+    return quotes[Math.floor(Math.random() * quotes.length)];
   };
 
-  const getPersonalRecords = () => {
-    const prs: {[key: string]: {weight: number; reps: number; date: Date}} = {};
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Header */}
+        <LinearGradient
+          colors={[colors.primary + '20', 'transparent']}
+          style={styles.headerGradient}
+        >
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.greeting}>{getGreeting()}</Text>
+              <Text style={styles.userName}>
+                {userName || 'Athlete'} 💪
+              </Text>
+            </View>
+            <View style={styles.streakBadge}>
+              <Text style={styles.streakNumber}>{stats.streak}</Text>
+              <Text style={styles.streakLabel}>day{stats.streak !== 1 ? 's' : ''}</Text>
+            </View>
+          </View>
+          <Text style={styles.quote}>"{getMotivationalQuote()}"</Text>
+        </LinearGradient>
+
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          <TouchableOpacity style={styles.statCard} activeOpacity={0.8}>
+            <LinearGradient
+              colors={[colors.primary, colors.gradient.end]}
+              style={styles.statGradient}
+            >
+              <Text style={styles.statNumber}>{stats.totalWorkouts}</Text>
+              <Text style={styles.statLabel}>Total Workouts</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.statCard} activeOpacity={0.8}>
+            <LinearGradient
+              colors={[colors.success, '#3DBDB6']}
+              style={styles.statGradient}
+            >
+              <Text style={styles.statNumber}>{stats.thisWeek}</Text>
+              <Text style={styles.statLabel}>This Week</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.statCard} activeOpacity={0.8}>
+            <LinearGradient
+              colors={[colors.secondary, '#FF5252']}
+              style={styles.statGradient}
+            >
+              <Text style={styles.statNumber}>
+                {Math.round(stats.totalVolume / 1000)}k
+              </Text>
+              <Text style={styles.statLabel}>Total Volume</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.statCard} activeOpacity={0.8}>
+            <LinearGradient
+              colors={[colors.warning, '#FFC947']}
+              style={styles.statGradient}
+            >
+              <Text style={styles.statNumber}>
+                {savedWorkouts.length > 0 
+                  ? Math.round(stats.totalVolume / stats.totalWorkouts)
+                  : 0}
+              </Text>
+              <Text style={styles.statLabel}>Avg Volume</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+
+        {/* Personal Records */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Personal Records</Text>
+            <TouchableOpacity activeOpacity={0.7}>
+              <Text style={styles.seeAll}>See All →</Text>
+            </TouchableOpacity>
+          </View>
+
+          {getPersonalRecords().length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.prScroll}
+            >
+              {getPersonalRecords().map((pr, index) => (
+                <Card key={index} style={styles.prCard} variant="elevated">
+                  <View style={styles.prIcon}>
+                    <Text style={styles.prEmoji}>🏆</Text>
+                  </View>
+                  <Text style={styles.prExercise} numberOfLines={1}>
+                    {pr.exercise}
+                  </Text>
+                  <Text style={styles.prValue}>
+                    {pr.weight} lbs × {pr.reps}
+                  </Text>
+                  <Text style={styles.prDate}>{pr.date}</Text>
+                </Card>
+              ))}
+            </ScrollView>
+          ) : (
+            <Card style={styles.emptyCard}>
+              <Text style={styles.emptyText}>No records yet</Text>
+              <Text style={styles.emptySubtext}>
+                Complete workouts to set personal records
+              </Text>
+            </Card>
+          )}
+        </View>
+
+        {/* Recent Activity */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            <TouchableOpacity activeOpacity={0.7}>
+              <Text style={styles.seeAll}>History →</Text>
+            </TouchableOpacity>
+          </View>
+
+          {savedWorkouts.length > 0 ? (
+            savedWorkouts.slice(0, 3).map((workout, index) => (
+              <Card key={workout.id} style={styles.activityCard} variant="elevated">
+                <View style={styles.activityHeader}>
+                  <View style={styles.activityDate}>
+                    <Text style={styles.activityDay}>
+                      {new Date(workout.timestamp).getDate()}
+                    </Text>
+                    <Text style={styles.activityMonth}>
+                      {new Date(workout.timestamp).toLocaleDateString('en-US', { month: 'short' })}
+                    </Text>
+                  </View>
+                  <View style={styles.activityInfo}>
+                    <Text style={styles.activityTitle}>
+                      {workout.name || `Workout #${savedWorkouts.length - index}`}
+                    </Text>
+                    <Text style={styles.activityStats}>
+                      {workout.duration} min • {workout.exercises.length} exercises
+                    </Text>
+                  </View>
+                  <View style={styles.activityVolume}>
+                    <Text style={styles.volumeNumber}>
+                      {Math.round(
+                        workout.exercises.reduce((total, ex) => 
+                          total + ex.sets.reduce((sum, set) => 
+                            sum + (set.weight * set.actual || 0), 0
+                          ), 0
+                        )
+                      )}
+                    </Text>
+                    <Text style={styles.volumeLabel}>lbs</Text>
+                  </View>
+                </View>
+              </Card>
+            ))
+          ) : (
+            <Card style={styles.emptyCard}>
+              <Text style={styles.emptyText}>No workouts yet</Text>
+              <Text style={styles.emptySubtext}>
+                Start your fitness journey today!
+              </Text>
+            </Card>
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+
+  function getPersonalRecords() {
+    const prs: any[] = [];
+    const exercisePRs: { [key: string]: { weight: number; reps: number; date: string } } = {};
 
     savedWorkouts.forEach(workout => {
       workout.exercises.forEach(exercise => {
         exercise.sets.forEach(set => {
           if (set.actual > 0 && set.weight > 0) {
             const key = exercise.name;
-            if (!prs[key] || set.weight > prs[key].weight) {
-              prs[key] = {
+            if (!exercisePRs[key] || set.weight > exercisePRs[key].weight) {
+              exercisePRs[key] = {
                 weight: set.weight,
                 reps: set.actual,
-                date: new Date(workout.timestamp),
+                date: new Date(workout.timestamp).toLocaleDateString(),
               };
             }
           }
@@ -80,180 +283,15 @@ export default function HomeScreen() {
       });
     });
 
-    return Object.entries(prs)
-      .sort((a, b) => b[1].weight - a[1].weight)
-      .slice(0, 3);
-  };
-
-  const personalRecords = getPersonalRecords();
-
-  if (savedWorkouts.length === 0) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.emptyContainer}>
-          <View style={styles.emptyIconContainer}>
-            <Icon
-              name="barbell-outline"
-              size={64}
-              color={colors.textTertiary}
-            />
-          </View>
-          <Text style={styles.emptyTitle}>Start Your Journey</Text>
-          <Text style={styles.emptyText}>
-            Complete your first workout to begin tracking your progress
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
+    return Object.entries(exercisePRs)
+      .slice(0, 5)
+      .map(([exercise, pr]) => ({
+        exercise,
+        weight: pr.weight,
+        reps: pr.reps,
+        date: pr.date,
+      }));
   }
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.screenTitle}>Progress</Text>
-          {userName && (
-            <Text style={styles.welcomeText}>Welcome back, {userName}</Text>
-          )}
-        </View>
-
-        {/* Overview Cards */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.cardsContainer}
-          contentContainerStyle={styles.cardsContent}>
-          <View style={[styles.overviewCard, styles.primaryCard]}>
-            <View style={styles.cardHeader}>
-              <Icon name="flame" size={24} color={colors.warning} />
-              <Text style={styles.cardLabel}>Streak</Text>
-            </View>
-            <Text style={styles.cardValue}>{getWeeklyStreak()}</Text>
-            <Text style={styles.cardUnit}>weeks</Text>
-          </View>
-
-          <View style={styles.overviewCard}>
-            <View style={styles.cardHeader}>
-              <Icon name="calendar-outline" size={24} color={colors.accent} />
-              <Text style={styles.cardLabel}>This Week</Text>
-            </View>
-            <Text style={styles.cardValue}>{getThisWeekWorkouts()}</Text>
-            <Text style={styles.cardUnit}>workouts</Text>
-          </View>
-
-          <View style={styles.overviewCard}>
-            <View style={styles.cardHeader}>
-              <Icon name="analytics" size={24} color={colors.success} />
-              <Text style={styles.cardLabel}>Total Volume</Text>
-            </View>
-            <Text style={styles.cardValue}>
-              {Math.round(getTotalVolume() / 1000)}k
-            </Text>
-            <Text style={styles.cardUnit}>pounds</Text>
-          </View>
-        </ScrollView>
-
-        {/* Personal Records */}
-        {personalRecords.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Personal Records</Text>
-              <TouchableOpacity>
-                <Text style={styles.seeAllText}>See All</Text>
-              </TouchableOpacity>
-            </View>
-
-            {personalRecords.map(([exercise, record], index) => (
-              <TouchableOpacity key={exercise} style={styles.recordCard}>
-                <View style={styles.recordRank}>
-                  <Text style={styles.recordRankText}>#{index + 1}</Text>
-                </View>
-                <View style={styles.recordContent}>
-                  <Text style={styles.recordExercise}>{exercise}</Text>
-                  <Text style={styles.recordDate}>
-                    {record.date.toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </Text>
-                </View>
-                <View style={styles.recordStats}>
-                  <Text style={styles.recordWeight}>{record.weight} lbs</Text>
-                  <Text style={styles.recordReps}>{record.reps} reps</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Recent Activity */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
-          {savedWorkouts.slice(0, 5).map((workout, index) => {
-            const volume = workout.exercises.reduce((total, exercise) => {
-              return (
-                total +
-                exercise.sets.reduce((setTotal, set) => {
-                  return setTotal + (set.weight * set.actual || 0);
-                }, 0)
-              );
-            }, 0);
-
-            const isToday =
-              new Date(workout.timestamp).toDateString() ===
-              new Date().toDateString();
-            const isYesterday =
-              new Date(workout.timestamp).toDateString() ===
-              new Date(Date.now() - 86400000).toDateString();
-
-            return (
-              <TouchableOpacity key={workout.id} style={styles.activityCard}>
-                <View style={styles.activityLeft}>
-                  <Text style={styles.activityDate}>
-                    {isToday
-                      ? 'Today'
-                      : isYesterday
-                      ? 'Yesterday'
-                      : new Date(workout.timestamp).toLocaleDateString(
-                          'en-US',
-                          {
-                            weekday: 'short',
-                            month: 'short',
-                            day: 'numeric',
-                          },
-                        )}
-                  </Text>
-                  <View style={styles.activityStats}>
-                    <Text style={styles.activityStat}>
-                      <Icon
-                        name="time-outline"
-                        size={14}
-                        color={colors.textSecondary}
-                      />{' '}
-                      {workout.duration} min
-                    </Text>
-                    <Text style={styles.activityDot}>•</Text>
-                    <Text style={styles.activityStat}>
-                      {workout.exercises.length} exercises
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.activityRight}>
-                  <Text style={styles.activityVolume}>
-                    {Math.round(volume)}
-                  </Text>
-                  <Text style={styles.activityVolumeLabel}>lbs</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
 }
 
 const styles = StyleSheet.create({
@@ -264,200 +302,207 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  scrollContent: {
+    paddingBottom: spacing.xl,
+  },
+  headerGradient: {
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 24,
-  },
-  screenTitle: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 4,
-  },
-  welcomeText: {
-    fontSize: 17,
-    color: colors.textSecondary,
-  },
-  // Overview Cards
-  cardsContainer: {
-    marginBottom: 32,
-  },
-  cardsContent: {
-    paddingHorizontal: 20,
-  },
-  overviewCard: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: 16,
-    padding: 20,
-    marginRight: 12,
-    width: 140,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  primaryCard: {
-    borderColor: colors.warning,
-    backgroundColor: colors.cardBackgroundSecondary,
-  },
-  cardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
   },
-  cardLabel: {
-    fontSize: 14,
+  greeting: {
+    fontSize: typography.sizes.md,
     color: colors.textSecondary,
-    marginLeft: 8,
-    fontWeight: '500',
+    marginBottom: spacing.xs,
   },
-  cardValue: {
-    fontSize: 36,
-    fontWeight: '700',
+  userName: {
+    fontSize: typography.sizes.xxxl,
+    fontWeight: typography.weights.heavy,
     color: colors.textPrimary,
-    marginBottom: 2,
   },
-  cardUnit: {
-    fontSize: 14,
-    color: colors.textTertiary,
-    fontWeight: '500',
+  streakBadge: {
+    backgroundColor: colors.primary,
+    borderRadius: 20,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    ...shadows.medium,
   },
-  // Sections
+  streakNumber: {
+    fontSize: typography.sizes.xxl,
+    fontWeight: typography.weights.bold,
+    color: colors.textPrimary,
+  },
+  streakLabel: {
+    fontSize: typography.sizes.xs,
+    color: colors.textPrimary,
+    opacity: 0.9,
+  },
+  quote: {
+    fontSize: typography.sizes.lg,
+    fontStyle: 'italic',
+    color: colors.textSecondary,
+    textAlign: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: spacing.md,
+    marginTop: -spacing.md,
+  },
+  statCard: {
+    width: (width - spacing.md * 3) / 2,
+    margin: spacing.xs,
+    borderRadius: 16,
+    overflow: 'hidden',
+    ...shadows.medium,
+  },
+  statGradient: {
+    padding: spacing.lg,
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: typography.sizes.xxxl,
+    fontWeight: typography.weights.heavy,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  statLabel: {
+    fontSize: typography.sizes.sm,
+    color: colors.textPrimary,
+    opacity: 0.9,
+  },
   section: {
-    paddingHorizontal: 20,
-    marginBottom: 32,
+    marginTop: spacing.xl,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
   },
   sectionTitle: {
-    fontSize: 22,
-    fontWeight: '600',
+    fontSize: typography.sizes.xxl,
+    fontWeight: typography.weights.bold,
     color: colors.textPrimary,
   },
-  seeAllText: {
-    fontSize: 16,
-    color: colors.accent,
-    fontWeight: '500',
+  seeAll: {
+    fontSize: typography.sizes.sm,
+    color: colors.primary,
+    fontWeight: typography.weights.semibold,
   },
-  // Personal Records
-  recordCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.cardBackground,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
+  prScroll: {
+    paddingHorizontal: spacing.lg,
   },
-  recordRank: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.accentBackground,
+  prCard: {
+    width: 140,
+    marginRight: spacing.md,
     alignItems: 'center',
+  },
+  prIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.warning + '20',
     justifyContent: 'center',
-    marginRight: 12,
-  },
-  recordRankText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.accent,
-  },
-  recordContent: {
-    flex: 1,
-  },
-  recordExercise: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 2,
-  },
-  recordDate: {
-    fontSize: 13,
-    color: colors.textTertiary,
-  },
-  recordStats: {
-    alignItems: 'flex-end',
-  },
-  recordWeight: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.accent,
-    marginBottom: 2,
-  },
-  recordReps: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  // Activity
-  activityCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    marginBottom: spacing.sm,
   },
-  activityLeft: {
-    flex: 1,
+  prEmoji: {
+    fontSize: 24,
+  },
+  prExercise: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+  },
+  prValue: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold,
+    color: colors.primary,
+    marginBottom: spacing.xs,
+  },
+  prDate: {
+    fontSize: typography.sizes.xs,
+    color: colors.textSecondary,
+  },
+  activityCard: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  activityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   activityDate: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 4,
-  },
-  activityStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  activityStat: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  activityDot: {
-    color: colors.textTertiary,
-    marginHorizontal: 8,
-  },
-  activityRight: {
-    alignItems: 'flex-end',
-  },
-  activityVolume: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  activityVolumeLabel: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  // Empty state
-  emptyContainer: {
-    flex: 1,
+    width: 50,
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: colors.primary + '20',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    marginRight: spacing.md,
   },
-  emptyIconContainer: {
-    marginBottom: 24,
+  activityDay: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold,
+    color: colors.primary,
   },
-  emptyTitle: {
-    fontSize: 24,
-    fontWeight: '600',
+  activityMonth: {
+    fontSize: typography.sizes.xs,
+    color: colors.primary,
+    textTransform: 'uppercase',
+  },
+  activityInfo: {
+    flex: 1,
+  },
+  activityTitle: {
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold,
     color: colors.textPrimary,
-    marginBottom: 8,
-    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  activityStats: {
+    fontSize: typography.sizes.sm,
+    color: colors.textSecondary,
+  },
+  activityVolume: {
+    alignItems: 'center',
+  },
+  volumeNumber: {
+    fontSize: typography.sizes.xl,
+    fontWeight: typography.weights.bold,
+    color: colors.textPrimary,
+  },
+  volumeLabel: {
+    fontSize: typography.sizes.xs,
+    color: colors.textSecondary,
+  },
+  emptyCard: {
+    marginHorizontal: spacing.lg,
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.semibold,
     color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
+    marginBottom: spacing.xs,
   },
-});
+  emptySubtext: {
+    fontSize: typography.sizes.sm,
+    color: colors.textTertiary,
+  },
+}); { width: 40 }]}>SET</Text>
+              <Text style={[styles.headerText, { flex: 1 }]}>PREVIOUS</Text>
+              <Text style={[styles.headerText,

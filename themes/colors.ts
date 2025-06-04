@@ -1,47 +1,39 @@
-// themes/colors.ts
 export const colors = {
-  // Backgrounds - Hevy uses pure blacks
-  background: '#000000', // Pure black
-  cardBackground: '#0A0A0A', // Very subtle gray
-  cardBackgroundSecondary: '#111111', // Slightly lighter
-  setRowBackground: '#000000', // Match background
-  setRowCompleted: '#0A1A0A', // Very subtle green tint
+  // Core Colors
+  primary: '#00D9FF', // Vibrant cyan for primary actions
+  secondary: '#FF6B6B', // Coral red for accents
+  success: '#4ECDC4', // Mint green for success states
+  warning: '#FFE66D', // Soft yellow for warnings
+  danger: '#FF6B6B', // Red for destructive actions
 
-  // Text - High contrast
-  textPrimary: '#FFFFFF', // Pure white
-  textSecondary: '#999999', // Hevy's gray
-  textTertiary: '#666666', // Even lighter
-  buttonText: '#000000', // Black on green buttons
-  timerText: '#FFFFFF',
+  // Backgrounds
+  background: '#0A0A0B', // Pure black for premium feel
+  cardBackground: '#141416', // Slightly elevated cards
+  elevated: '#1C1C1F', // Higher elevation
+  modalBackground: '#1E1E21', // Modal overlays
 
-  // Accent - Hevy's green
-  accent: '#4CD964', // Hevy green
-  accentSecondary: '#3FB351', // Darker green
-  accentDim: 'rgba(76, 217, 100, 0.1)', // Very subtle green
+  // Text
+  textPrimary: '#FFFFFF', // Pure white for primary text
+  textSecondary: '#8E8E93', // iOS-style gray
+  textTertiary: '#48484A', // Subtle text
+  textAccent: '#00D9FF', // Cyan accent text
 
-  // Status
-  success: '#4CD964',
-  warning: '#FF9500',
-  danger: '#FF3B30',
+  // UI Elements
+  border: '#2C2C2E', // Subtle borders
+  divider: '#38383A', // Divider lines
+  inputBackground: '#1C1C1E', // Input fields
+  inputBorder: '#38383A', // Input borders
 
-  // Borders - Almost invisible
-  border: '#1C1C1C', // Very subtle
-  borderLight: '#2C2C2C',
-  setRowBorderCompleted: '#4CD964',
-
-  // Inputs
-  inputBackground: '#1C1C1C',
-  inputBorder: '#2C2C2C',
+  // States
+  active: '#00D9FF', // Active states
+  inactive: '#48484A', // Inactive elements
+  disabled: '#2C2C2E', // Disabled state
+  overlay: 'rgba(0, 0, 0, 0.7)', // Modal overlays
 
   // Special
-  timerBackground: '#1C1C1C',
-  timerShadowColor: '#000000',
-  tabBarBackground: '#000000',
-  tabBarBorder: '#1C1C1C',
-  tabIconActive: '#4CD964',
-  tabIconInactive: '#666666',
-
-  // Remove old
-  finish: '#4CD964',
-  loading: 'rgba(76, 217, 100, 0.5)',
+  gradient: {
+    start: '#00D9FF',
+    end: '#0099CC',
+  },
+  shadow: '#000000',
 };
