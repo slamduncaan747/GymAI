@@ -1,5 +1,4 @@
-// screens/HomeScreen.tsx (Redesigned)
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -9,16 +8,15 @@ import {
   TouchableOpacity,
   Dimensions,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
-import { useWorkout } from '../context/WorkoutContext';
-import { colors, typography, spacing, shadows } from '../themes';
+import {useWorkout} from '../context/WorkoutContext';
+import {colors, typography, spacing, shadows} from '../themes';
 import Card from '../components/common/Card';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const { width } = Dimensions.get('window');
+const {width} = Dimensions.get('window');
 
 export default function HomeScreen() {
-  const { loadSavedWorkouts, savedWorkouts } = useWorkout();
+  const {loadSavedWorkouts, savedWorkouts} = useWorkout();
   const [userName, setUserName] = useState('');
 
   useEffect(() => {
@@ -38,37 +36,80 @@ export default function HomeScreen() {
   const stats = {
     totalWorkouts: savedWorkouts.length,
     thisWeek: savedWorkouts.filter(
-      w => w.timestamp > Date.now() - 7 * 24 * 60 * 60 * 1000
+      w => w.timestamp > Date.now() - 7 * 24 * 60 * 60 * 1000,
     ).length,
     totalVolume: savedWorkouts.reduce((total, workout) => {
-      return total + workout.exercises.reduce((workoutTotal, exercise) => {
-        return workoutTotal + exercise.sets.reduce((setTotal, set) => {
-          return setTotal + (set.weight * set.actual || 0);
-        }, 0);
-      }, 0);
+      return (
+        total +
+        workout.exercises.reduce((workoutTotal, exercise) => {
+          return (
+            workoutTotal +
+            exercise.sets.reduce((setTotal, set) => {
+              return setTotal + (set.weight * set.actual || 0);
+            }, 0)
+          );
+        }, 0)
+      );
     }, 0),
     streak: calculateStreak(savedWorkouts),
   };
 
   function calculateStreak(workouts: any[]) {
     if (workouts.length === 0) return 0;
-    
-    const sortedWorkouts = [...workouts].sort((a, b) => b.timestamp - a.timestamp);
+
+    const sortedWorkouts = [...workouts].sort(
+      (a, b) => b.timestamp - a.timestamp,
+    );
     let streak = 0;
     let currentDate = new Date();
-    
+
     for (const workout of sortedWorkouts) {
       const workoutDate = new Date(workout.timestamp);
-      const dayDiff = Math.floor((currentDate.getTime() - workoutDate.getTime()) / (1000 * 60 * 60 * 24));
-      
+      const dayDiff = Math.floor(
+        (currentDate.getTime() - workoutDate.getTime()) / (1000 * 60 * 60 * 24),
+      );
+
       if (dayDiff <= streak + 1) {
         streak = dayDiff + 1;
       } else {
         break;
       }
     }
-    
+
     return streak;
+  }
+
+  function getPersonalRecords() {
+    const prs: any[] = [];
+    const exercisePRs: {
+      [key: string]: {weight: number; reps: number; date: string};
+    } = {};
+
+    savedWorkouts.forEach(workout => {
+      workout.exercises.forEach(exercise => {
+        exercise.sets.forEach(set => {
+          if (set.actual > 0 && set.weight > 0) {
+            const key = exercise.name;
+            if (!exercisePRs[key] || set.weight > exercisePRs[key].weight) {
+              exercisePRs[key] = {
+                weight: set.weight,
+                reps: set.actual,
+                date: new Date(workout.timestamp).toLocaleDateString(),
+              };
+            }
+          }
+        });
+      });
+    });
+
+    return Object.entries(exercisePRs)
+      .slice(0, 5)
+      .map(([exercise, pr]) => ({
+        exercise,
+        weight: pr.weight,
+        reps: pr.reps,
+        date: pr.date,
+      }));
   }
 
   const getGreeting = () => {
@@ -80,11 +121,11 @@ export default function HomeScreen() {
 
   const getMotivationalQuote = () => {
     const quotes = [
-      "Every rep counts",
-      "Stronger than yesterday",
-      "Progress, not perfection",
-      "Crush your goals",
-      "Stay consistent",
+      'Every rep counts',
+      'Stronger than yesterday',
+      'Progress, not perfection',
+      'Crush your goals',
+      'Stay consistent',
     ];
     return quotes[Math.floor(Math.random() * quotes.length)];
   };
@@ -94,74 +135,65 @@ export default function HomeScreen() {
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
+        contentContainerStyle={styles.scrollContent}>
         {/* Header */}
-        <LinearGradient
-          colors={[colors.primary + '20', 'transparent']}
-          style={styles.headerGradient}
-        >
+        <View style={styles.headerContainer}>
           <View style={styles.header}>
             <View>
               <Text style={styles.greeting}>{getGreeting()}</Text>
-              <Text style={styles.userName}>
-                {userName || 'Athlete'} 💪
-              </Text>
+              <Text style={styles.userName}>{userName || 'Athlete'} 💪</Text>
             </View>
             <View style={styles.streakBadge}>
               <Text style={styles.streakNumber}>{stats.streak}</Text>
-              <Text style={styles.streakLabel}>day{stats.streak !== 1 ? 's' : ''}</Text>
+              <Text style={styles.streakLabel}>
+                day{stats.streak !== 1 ? 's' : ''}
+              </Text>
             </View>
           </View>
           <Text style={styles.quote}>"{getMotivationalQuote()}"</Text>
-        </LinearGradient>
+        </View>
 
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
           <TouchableOpacity style={styles.statCard} activeOpacity={0.8}>
-            <LinearGradient
-              colors={[colors.primary, colors.gradient.end]}
-              style={styles.statGradient}
-            >
+            <View
+              style={[styles.statContainer, {backgroundColor: colors.primary}]}>
               <Text style={styles.statNumber}>{stats.totalWorkouts}</Text>
               <Text style={styles.statLabel}>Total Workouts</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.statCard} activeOpacity={0.8}>
-            <LinearGradient
-              colors={[colors.success, '#3DBDB6']}
-              style={styles.statGradient}
-            >
+            <View
+              style={[styles.statContainer, {backgroundColor: colors.success}]}>
               <Text style={styles.statNumber}>{stats.thisWeek}</Text>
               <Text style={styles.statLabel}>This Week</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.statCard} activeOpacity={0.8}>
-            <LinearGradient
-              colors={[colors.secondary, '#FF5252']}
-              style={styles.statGradient}
-            >
+            <View
+              style={[
+                styles.statContainer,
+                {backgroundColor: colors.secondary},
+              ]}>
               <Text style={styles.statNumber}>
                 {Math.round(stats.totalVolume / 1000)}k
               </Text>
               <Text style={styles.statLabel}>Total Volume</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.statCard} activeOpacity={0.8}>
-            <LinearGradient
-              colors={[colors.warning, '#FFC947']}
-              style={styles.statGradient}
-            >
+            <View
+              style={[styles.statContainer, {backgroundColor: colors.warning}]}>
               <Text style={styles.statNumber}>
-                {savedWorkouts.length > 0 
+                {savedWorkouts.length > 0
                   ? Math.round(stats.totalVolume / stats.totalWorkouts)
                   : 0}
               </Text>
               <Text style={styles.statLabel}>Avg Volume</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -178,8 +210,7 @@ export default function HomeScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.prScroll}
-            >
+              contentContainerStyle={styles.prScroll}>
               {getPersonalRecords().map((pr, index) => (
                 <Card key={index} style={styles.prCard} variant="elevated">
                   <View style={styles.prIcon}>
@@ -216,32 +247,44 @@ export default function HomeScreen() {
 
           {savedWorkouts.length > 0 ? (
             savedWorkouts.slice(0, 3).map((workout, index) => (
-              <Card key={workout.id} style={styles.activityCard} variant="elevated">
+              <Card
+                key={workout.id}
+                style={styles.activityCard}
+                variant="elevated">
                 <View style={styles.activityHeader}>
                   <View style={styles.activityDate}>
                     <Text style={styles.activityDay}>
                       {new Date(workout.timestamp).getDate()}
                     </Text>
                     <Text style={styles.activityMonth}>
-                      {new Date(workout.timestamp).toLocaleDateString('en-US', { month: 'short' })}
+                      {new Date(workout.timestamp).toLocaleDateString('en-US', {
+                        month: 'short',
+                      })}
                     </Text>
                   </View>
                   <View style={styles.activityInfo}>
                     <Text style={styles.activityTitle}>
-                      {workout.name || `Workout #${savedWorkouts.length - index}`}
+                      {workout.name ||
+                        `Workout #${savedWorkouts.length - index}`}
                     </Text>
                     <Text style={styles.activityStats}>
-                      {workout.duration} min • {workout.exercises.length} exercises
+                      {workout.duration} min • {workout.exercises.length}{' '}
+                      exercises
                     </Text>
                   </View>
                   <View style={styles.activityVolume}>
                     <Text style={styles.volumeNumber}>
                       {Math.round(
-                        workout.exercises.reduce((total, ex) => 
-                          total + ex.sets.reduce((sum, set) => 
-                            sum + (set.weight * set.actual || 0), 0
-                          ), 0
-                        )
+                        workout.exercises.reduce(
+                          (total, ex) =>
+                            total +
+                            ex.sets.reduce(
+                              (sum, set) =>
+                                sum + (set.weight * set.actual || 0),
+                              0,
+                            ),
+                          0,
+                        ),
                       )}
                     </Text>
                     <Text style={styles.volumeLabel}>lbs</Text>
@@ -261,37 +304,6 @@ export default function HomeScreen() {
       </ScrollView>
     </SafeAreaView>
   );
-
-  function getPersonalRecords() {
-    const prs: any[] = [];
-    const exercisePRs: { [key: string]: { weight: number; reps: number; date: string } } = {};
-
-    savedWorkouts.forEach(workout => {
-      workout.exercises.forEach(exercise => {
-        exercise.sets.forEach(set => {
-          if (set.actual > 0 && set.weight > 0) {
-            const key = exercise.name;
-            if (!exercisePRs[key] || set.weight > exercisePRs[key].weight) {
-              exercisePRs[key] = {
-                weight: set.weight,
-                reps: set.actual,
-                date: new Date(workout.timestamp).toLocaleDateString(),
-              };
-            }
-          }
-        });
-      });
-    });
-
-    return Object.entries(exercisePRs)
-      .slice(0, 5)
-      .map(([exercise, pr]) => ({
-        exercise,
-        weight: pr.weight,
-        reps: pr.reps,
-        date: pr.date,
-      }));
-  }
 }
 
 const styles = StyleSheet.create({
@@ -305,7 +317,8 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: spacing.xl,
   },
-  headerGradient: {
+  headerContainer: {
+    backgroundColor: colors.backgroundLight,
     paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
@@ -364,7 +377,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...shadows.medium,
   },
-  statGradient: {
+  statContainer: {
     padding: spacing.lg,
     alignItems: 'center',
   },
@@ -503,6 +516,4 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     color: colors.textTertiary,
   },
-}); { width: 40 }]}>SET</Text>
-              <Text style={[styles.headerText, { flex: 1 }]}>PREVIOUS</Text>
-              <Text style={[styles.headerText,
+});

@@ -1,3 +1,4 @@
+// components/common/Card.tsx
 import React from 'react';
 import {View, StyleSheet, ViewStyle} from 'react-native';
 import {colors, spacing, shadows} from '../../themes';

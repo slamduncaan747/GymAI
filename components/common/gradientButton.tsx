@@ -1,4 +1,3 @@
-// components/common/GradientButton.tsx
 import React from 'react';
 import {
   TouchableOpacity,
@@ -7,8 +6,8 @@ import {
   ActivityIndicator,
   ViewStyle,
   TextStyle,
+  View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import {colors, typography, spacing, shadows} from '../../themes';
 
 interface GradientButtonProps {
@@ -95,20 +94,15 @@ export default function GradientButton({
       onPress={onPress}
       disabled={isDisabled}
       activeOpacity={0.9}>
-      <LinearGradient
-        colors={
-          variant === 'primary'
-            ? [colors.gradient.start, colors.gradient.end]
-            : [colors.secondary, '#FF5252']
-        }
-        start={{x: 0, y: 0}}
-        end={{x: 1, y: 0}}
+      <View
         style={[
           styles.gradient,
           {
             paddingVertical: sizeStyles.paddingVertical,
             paddingHorizontal: sizeStyles.paddingHorizontal,
           },
+          variant === 'primary' && styles.primaryGradient,
+          variant === 'secondary' && styles.secondaryGradient,
         ]}>
         {loading ? (
           <ActivityIndicator color="white" size="small" />
@@ -118,7 +112,7 @@ export default function GradientButton({
             {title}
           </Text>
         )}
-      </LinearGradient>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -132,6 +126,17 @@ const styles = StyleSheet.create({
   gradient: {
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'transparent', // Base layer for gradient effect
+  },
+  primaryGradient: {
+    backgroundColor: colors.gradient.start, // Solid color as a fallback
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  secondaryGradient: {
+    backgroundColor: colors.secondary, // Solid color as a fallback
+    position: 'relative',
+    overflow: 'hidden',
   },
   text: {
     color: colors.textPrimary,

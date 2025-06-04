@@ -1,6 +1,9 @@
-// services/exerciseService.ts
-
-import {Exercise, UserPreferences, WorkoutExercise} from '../types/workout';
+import {
+  Exercise,
+  UserPreferences,
+  WorkoutExercise,
+  WorkoutSet,
+} from '../types/workout';
 import {EXERCISE_DATABASE} from '../data/exerciseDatabase';
 
 class ExerciseService {
@@ -14,6 +17,13 @@ class ExerciseService {
   // Get exercise by ID
   getExerciseById(id: string): Exercise | undefined {
     return this.exercises.find(exercise => exercise.id === id);
+  }
+
+  // Get exercise by name
+  getExerciseByName(name: string): Exercise | undefined {
+    return this.exercises.find(
+      ex => ex.name.toLowerCase() === name.toLowerCase(),
+    );
   }
 
   // Get exercises by category
@@ -75,7 +85,7 @@ class ExerciseService {
       }
 
       // Check avoided muscle groups
-      if (preferences.avoidMuscleGroups) {
+      if (preferences.avoidMuscleGroups?.length) {
         const hasAvoidedMuscle = exercise.muscleGroups.primary.some(muscle =>
           preferences.avoidMuscleGroups!.includes(muscle),
         );
@@ -140,17 +150,20 @@ class ExerciseService {
 
   // Convert Exercise to WorkoutExercise
   toWorkoutExercise(exercise: Exercise): WorkoutExercise {
+    const setCount = exercise.defaultSets || 3;
+    const sets: WorkoutSet[] = Array.from({length: setCount}, () => ({
+      target: exercise.defaultReps || 10,
+      actual: 0,
+      weight: exercise.defaultWeight || 0,
+      completed: false,
+    }));
+
     return {
       id: exercise.id,
       name: exercise.name,
-      targetReps: exercise.defaultReps,
-      sets: Array.from({length: exercise.defaultSets}, () => ({
-        target: exercise.defaultReps,
-        actual: 0,
-        weight: exercise.defaultWeight || 0,
-        completed: false,
-      })),
-      restTime: exercise.defaultRestSeconds,
+      targetReps: exercise.defaultReps || 10,
+      sets,
+      restTime: exercise.defaultRestSeconds || 60,
     };
   }
 
@@ -159,49 +172,62 @@ class ExerciseService {
     duration: number,
     preferences: UserPreferences,
     focusAreas?: Exercise['category'][],
+    targetExerciseCount?: number,
   ): WorkoutExercise[] {
     const exerciseTimeEstimate = 5; // minutes per exercise on average
-    const targetExerciseCount = Math.max(
-      3,
-      Math.min(10, Math.floor(duration / exerciseTimeEstimate)),
-    );
+    const exerciseCount =
+      targetExerciseCount ||
+      Math.max(3, Math.min(10, Math.floor(duration / exerciseTimeEstimate)));
 
-    const suitableExercises = this.getExercisesForUser(preferences);
+    let suitableExercises = this.getExercisesForUser(preferences);
 
     if (suitableExercises.length === 0) {
       // Fallback to bodyweight exercises if no equipment matches
       return this.getExercisesByEquipment(['bodyweight'])
-        .slice(0, targetExerciseCount)
+        .slice(0, exerciseCount)
         .map(ex => this.toWorkoutExercise(ex));
     }
 
     let selectedExercises: Exercise[] = [];
 
-    if (focusAreas && focusAreas.length > 0) {
+    if (focusAreas?.length) {
       // Prioritize focus areas
       const focusExercises = suitableExercises.filter(ex =>
         focusAreas.includes(ex.category),
       );
-
       const otherExercises = suitableExercises.filter(
         ex => !focusAreas.includes(ex.category),
       );
 
       // 70% focus areas, 30% other
-      const focusCount = Math.ceil(targetExerciseCount * 0.7);
-      const otherCount = targetExerciseCount - focusCount;
+      const focusCount = Math.ceil(exerciseCount * 0.7);
+      const otherCount = exerciseCount - focusCount;
 
       selectedExercises = [
         ...this.selectBalancedExercises(focusExercises, focusCount),
         ...this.selectBalancedExercises(otherExercises, otherCount),
       ];
+
+      // If not enough exercises, fill with any suitable exercises
+      if (selectedExercises.length < exerciseCount) {
+        const remaining = suitableExercises
+          .filter(ex => !selectedExercises.includes(ex))
+          .slice(0, exerciseCount - selectedExercises.length);
+        selectedExercises.push(...remaining);
+      }
     } else {
       // Generate a balanced full-body workout
       selectedExercises = this.selectBalancedExercises(
         suitableExercises,
-        targetExerciseCount,
+        exerciseCount,
       );
     }
+
+    // Balance muscle groups
+    selectedExercises = this.balanceMuscleGroups(
+      selectedExercises,
+      exerciseCount,
+    );
 
     return selectedExercises.map(ex => this.toWorkoutExercise(ex));
   }
@@ -268,6 +294,36 @@ class ExerciseService {
         (movementOrder[a.movement] || 99) - (movementOrder[b.movement] || 99)
       );
     });
+  }
+
+  // Balance muscle groups in selected exercises
+  private balanceMuscleGroups(
+    exercises: Exercise[],
+    targetCount: number,
+  ): Exercise[] {
+    const muscleGroupCounts: {[key: string]: number} = {};
+
+    // Count current muscle groups
+    exercises.forEach(ex => {
+      ex.muscleGroups.primary.forEach(muscle => {
+        muscleGroupCounts[muscle] = (muscleGroupCounts[muscle] || 0) + 1;
+      });
+    });
+
+    // Check if any muscle group is overrepresented
+    const maxCount = Math.ceil(targetCount / 3); // No muscle group should be more than 1/3
+    const overrepresented = Object.entries(muscleGroupCounts).some(
+      ([_, count]) => count > maxCount,
+    );
+
+    if (overrepresented) {
+      // Shuffle and trim to target count to attempt better balance
+      return [...exercises]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, targetCount);
+    }
+
+    return exercises.slice(0, targetCount);
   }
 }
 

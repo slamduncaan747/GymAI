@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 24,
-    color: colors.accent,
+    color: colors.secondary,
     fontWeight: 'bold',
   },
   title: {
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     marginLeft: 8,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.secondary,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,

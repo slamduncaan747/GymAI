@@ -276,7 +276,7 @@ export default function WorkoutScreen() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.accent} />
+        <ActivityIndicator size="large" color={colors.secondary} />
         <Text style={styles.loadingText}>Starting your workout...</Text>
       </View>
     );
@@ -455,7 +455,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   retryButton: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.secondary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   completeButton: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.secondary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',

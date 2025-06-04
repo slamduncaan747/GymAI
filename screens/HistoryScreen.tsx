@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
   workoutDate: {
     fontSize: 24,
     fontWeight: '700',
-    color: colors.accent,
+    color: colors.secondary,
   },
   workoutContent: {
     flex: 1,
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
   muscleTagText: {
     fontSize: 12,
     fontWeight: '600',
-    color: colors.accent,
+    color: colors.secondary,
   },
   workoutChevron: {
     marginLeft: 8,

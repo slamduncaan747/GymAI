@@ -269,7 +269,7 @@ const ReplaceExerciseModal: React.FC<ReplaceExerciseModalProps> = ({
 
           {isLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.accent} />
+              <ActivityIndicator size="large" color={colors.secondary} />
             </View>
           ) : (
             <FlatList
@@ -422,8 +422,8 @@ const styles = StyleSheet.create({
     borderColor: colors.inputBorder,
   },
   categoryChipActive: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
+    backgroundColor: colors.secondary,
+    borderColor: colors.secondary,
   },
   categoryText: {
     fontSize: 14,
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.accent,
+    color: colors.secondary,
   },
   list: {
     flex: 1,
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
   },
   statText: {
     fontSize: 14,
-    color: colors.accent,
+    color: colors.secondary,
     fontWeight: '600',
   },
   loadingContainer: {
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
   cancelText: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.accent,
+    color: colors.secondary,
   },
 });
 

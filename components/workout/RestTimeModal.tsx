@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   },
   doneButton: {
     flex: 1,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.secondary,
     paddingVertical: 16,
     borderRadius: 12,
   },

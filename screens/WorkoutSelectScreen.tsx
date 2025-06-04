@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
-import LinearGradient from 'react-native-linear-gradient';
 import {RootStackParamList} from '../App';
 import {colors, typography, spacing, shadows} from '../themes';
 import Card from '../components/common/Card';
@@ -83,7 +82,6 @@ export default function WorkoutSelectScreen() {
   );
 
   const handleDurationSelect = (duration: number, index: number) => {
-    // Animate the selection
     Animated.sequence([
       Animated.timing(scaleAnims[index], {
         toValue: 0.95,
@@ -137,11 +135,9 @@ export default function WorkoutSelectScreen() {
         <Card style={styles.aiCard} variant="elevated">
           <View style={styles.aiContent}>
             <View style={styles.aiIcon}>
-              <LinearGradient
-                colors={['#00D9FF', '#0099CC']}
-                style={styles.aiIconGradient}>
+              <View style={styles.aiIconBackground}>
                 <Text style={styles.aiEmoji}>🤖</Text>
-              </LinearGradient>
+              </View>
             </View>
             <View style={styles.aiTextContainer}>
               <Text style={styles.aiTitle}>AI-Powered</Text>
@@ -291,12 +287,13 @@ const styles = StyleSheet.create({
   aiIcon: {
     marginRight: spacing.md,
   },
-  aiIconGradient: {
+  aiIconBackground: {
     width: 48,
     height: 48,
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#00D9FF',
   },
   aiEmoji: {
     fontSize: 24,

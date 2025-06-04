@@ -294,7 +294,7 @@ export default function WorkoutPreviewScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.accent} />
+          <ActivityIndicator size="large" color={colors.secondary} />
           <Text style={styles.loadingText}>
             {useAI
               ? '🤖 AI is crafting your personalized workout...'
@@ -523,7 +523,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   retryButton: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.secondary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -546,7 +546,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 24,
-    color: colors.accent,
+    color: colors.secondary,
     fontWeight: 'bold',
   },
   title: {
@@ -621,7 +621,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   addButton: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.secondary,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
@@ -652,7 +652,7 @@ const styles = StyleSheet.create({
   exerciseNumber: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.accent,
+    color: colors.secondary,
     marginRight: 12,
     width: 30,
   },
@@ -696,7 +696,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   feedbackButton: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.secondary,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
@@ -721,14 +721,14 @@ const styles = StyleSheet.create({
   regenerateButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.accent,
+    color: colors.secondary,
   },
   startButton: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.secondary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
-    shadowColor: colors.accent,
+    shadowColor: colors.secondary,
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.2,
     shadowRadius: 4,

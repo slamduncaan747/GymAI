@@ -1,6 +1,6 @@
 // App.tsx
 
-import React from 'react';
+import React, {useEffect} from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
@@ -16,6 +16,9 @@ import ExercisePreviewScreen from './components/workout/ExercisePreviewScreen';
 import {WorkoutExercise, Workout} from './types/workout';
 import {colors} from './themes/colors';
 import Icon from 'react-native-vector-icons/Ionicons';
+
+// Ensure icon font is loaded
+Icon.loadFont();
 
 export type RootStackParamList = {
   MainTabs: undefined;

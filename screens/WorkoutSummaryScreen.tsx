@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: colors.accent,
+    color: colors.secondary,
     marginBottom: 4,
   },
   statLabel: {
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   prCard: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.secondary,
     borderRadius: 8,
     padding: 12,
     alignItems: 'center',
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
   },
   exerciseCompletion: {
     fontSize: 14,
-    color: colors.accent,
+    color: colors.secondary,
     fontWeight: '500',
   },
   exerciseStats: {
@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: colors.accent,
+    borderColor: colors.secondary,
   },
   achievementIcon: {
     fontSize: 32,
@@ -408,16 +408,16 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.accent,
+    borderColor: colors.secondary,
   },
   anotherButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.accent,
+    color: colors.secondary,
   },
   doneButton: {
     flex: 1,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.secondary,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
