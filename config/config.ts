@@ -1,9 +1,5 @@
-// config/config.ts
-
-// This is a placeholder for the OpenAI API key
-// In production, this should be handled through environment variables
-// or secure storage, not hardcoded
-export const OPENAI_API_KEY = '';
+export const OPENAI_API_KEY =
+  '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';
 
 // API endpoints
 export const API_ENDPOINTS = {

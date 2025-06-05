@@ -1,4 +1,5 @@
-// components/workout/SetInputRow.tsx (Redesigned)
+// components/workout/SetInputRow.tsx
+
 import React, {useState, useCallback, useEffect, useRef} from 'react';
 import {
   View,
@@ -7,21 +8,33 @@ import {
   TextInput,
   TouchableOpacity,
   Animated,
+  Platform,
 } from 'react-native';
 import {WorkoutSet} from '../../types/workout';
 import {colors, typography, spacing} from '../../themes';
 import {debounce} from 'lodash';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 interface SetInputRowProps {
   setNumber: number;
   set: WorkoutSet;
   onUpdate: (actual: number, weight: number, completed: boolean) => void;
+  onDelete?: () => void;
   previousSet?: WorkoutSet;
   restTime?: number;
+  canDelete?: boolean;
 }
 
 const SetInputRow: React.FC<SetInputRowProps> = React.memo(
-  ({setNumber, set, onUpdate, previousSet, restTime = 60}) => {
+  ({
+    setNumber,
+    set,
+    onUpdate,
+    onDelete,
+    previousSet,
+    restTime = 60,
+    canDelete = true,
+  }) => {
     const [weight, setWeight] = useState(
       set.weight > 0 ? set.weight.toString() : '',
     );
@@ -32,6 +45,9 @@ const SetInputRow: React.FC<SetInputRowProps> = React.memo(
     const checkmarkScale = useRef(
       new Animated.Value(isCompleted ? 1 : 0),
     ).current;
+    const rowScale = useRef(new Animated.Value(1)).current;
+    const deleteOpacity = useRef(new Animated.Value(0)).current;
+    const [showDelete, setShowDelete] = useState(false);
 
     const debouncedUpdate = useCallback(
       debounce((actual: number, weight: number, completed: boolean) => {
@@ -88,6 +104,41 @@ const SetInputRow: React.FC<SetInputRowProps> = React.memo(
         setIsCompleted(true);
         debouncedUpdate(currentReps, currentWeight, true);
       }
+
+      // Animate button press
+      Animated.sequence([
+        Animated.timing(rowScale, {
+          toValue: 0.98,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(rowScale, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    };
+
+    const toggleDelete = () => {
+      const newShowDelete = !showDelete;
+      setShowDelete(newShowDelete);
+
+      Animated.timing(deleteOpacity, {
+        toValue: newShowDelete ? 1 : 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const handleDelete = () => {
+      Animated.timing(rowScale, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => {
+        onDelete?.();
+      });
     };
 
     const getPreviousData = () => {
@@ -98,54 +149,69 @@ const SetInputRow: React.FC<SetInputRowProps> = React.memo(
     };
 
     return (
-      <View
-        style={[styles.container, isCompleted && styles.completedContainer]}>
-        <View style={styles.setNumberContainer}>
-          <Text style={styles.setNumber}>{setNumber}</Text>
-        </View>
+      <Animated.View
+        style={[
+          styles.container,
+          isCompleted && styles.completedContainer,
+          {transform: [{scale: rowScale}]},
+        ]}>
+        <Text style={styles.setNumber}>{setNumber}</Text>
 
-        <View style={styles.previousContainer}>
-          <Text style={styles.previousText}>{getPreviousData()}</Text>
-        </View>
+        <Text style={styles.previousText}>{getPreviousData()}</Text>
 
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={[styles.input, isCompleted && styles.inputCompleted]}
-            value={weight}
-            onChangeText={handleWeightChange}
-            placeholder="0"
-            placeholderTextColor={colors.textTertiary}
-            keyboardType="decimal-pad"
-            selectTextOnFocus
-            editable={true}
-          />
-        </View>
+        <TextInput
+          style={[styles.input, isCompleted && styles.inputCompleted]}
+          value={weight}
+          onChangeText={handleWeightChange}
+          placeholder="0"
+          placeholderTextColor={colors.textTertiary}
+          keyboardType="decimal-pad"
+          selectTextOnFocus
+          editable={true}
+        />
 
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={[styles.input, isCompleted && styles.inputCompleted]}
-            value={reps}
-            onChangeText={handleRepsChange}
-            placeholder={set.target > 0 ? set.target.toString() : '0'}
-            placeholderTextColor={colors.textTertiary}
-            keyboardType="number-pad"
-            selectTextOnFocus
-            editable={true}
-          />
-        </View>
+        <TextInput
+          style={[styles.input, isCompleted && styles.inputCompleted]}
+          value={reps}
+          onChangeText={handleRepsChange}
+          placeholder={set.target > 0 ? set.target.toString() : '0'}
+          placeholderTextColor={colors.textTertiary}
+          keyboardType="number-pad"
+          selectTextOnFocus
+          editable={true}
+        />
 
-        <TouchableOpacity
-          style={[styles.completeButton, isCompleted && styles.completedButton]}
-          onPress={handleComplete}
-          activeOpacity={0.7}>
-          <Animated.View
-            style={{
-              transform: [{scale: checkmarkScale}],
-            }}>
-            <Text style={styles.checkmark}>✓</Text>
+        {!showDelete ? (
+          <TouchableOpacity
+            style={[
+              styles.completeButton,
+              isCompleted && styles.completedButton,
+            ]}
+            onPress={handleComplete}
+            onLongPress={canDelete ? toggleDelete : undefined}
+            activeOpacity={0.7}>
+            <Animated.View
+              style={{
+                transform: [{scale: checkmarkScale}],
+              }}>
+              <Icon
+                name={isCompleted ? 'checkmark' : 'checkmark'}
+                size={20}
+                color={isCompleted ? colors.buttonText : colors.textTertiary}
+              />
+            </Animated.View>
+          </TouchableOpacity>
+        ) : (
+          <Animated.View style={{opacity: deleteOpacity}}>
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={handleDelete}
+              activeOpacity={0.7}>
+              <Icon name="trash-outline" size={18} color={colors.danger} />
+            </TouchableOpacity>
           </Animated.View>
-        </TouchableOpacity>
-      </View>
+        )}
+      </Animated.View>
     );
   },
 );
@@ -156,44 +222,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    backgroundColor: colors.background + '30',
+    backgroundColor: colors.surface,
+    borderRadius: 8,
   },
   completedContainer: {
-    backgroundColor: colors.primary + '10',
-  },
-  setNumberContainer: {
-    width: 40,
-    alignItems: 'center',
+    backgroundColor: colors.cardBackground,
   },
   setNumber: {
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.semibold,
-    color: colors.textSecondary,
-  },
-  previousContainer: {
     flex: 1,
-    alignItems: 'center',
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.medium,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   previousText: {
-    fontSize: typography.sizes.sm,
-    color: colors.textTertiary,
-    fontWeight: typography.weights.medium,
-  },
-  inputContainer: {
     flex: 1,
-    paddingHorizontal: spacing.xs,
+    fontSize: typography.sizes.caption,
+    color: colors.textTertiary,
+    textAlign: 'center',
   },
   input: {
+    flex: 1,
     backgroundColor: colors.inputBackground,
-    borderRadius: 12,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.semibold,
+    borderRadius: 8,
+    paddingVertical: Platform.OS === 'ios' ? spacing.sm : spacing.xs,
+    paddingHorizontal: spacing.sm,
+    marginHorizontal: spacing.xs,
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.medium,
     color: colors.textPrimary,
     textAlign: 'center',
     borderWidth: 1,
-    borderColor: colors.inputBorder,
+    borderColor: colors.border,
   },
   inputCompleted: {
     backgroundColor: colors.primary + '20',
@@ -201,24 +261,28 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   completeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.inputBackground,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: spacing.sm,
-    borderWidth: 2,
-    borderColor: colors.inputBorder,
+    borderWidth: 1.5,
+    borderColor: colors.border,
   },
   completedButton: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  checkmark: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: typography.weights.bold,
+  deleteButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.danger + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: spacing.sm,
   },
 });
 

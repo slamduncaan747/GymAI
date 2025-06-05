@@ -5,14 +5,15 @@ import {exerciseService} from '../service/exerciseService';
 import {createOpenAIService} from '../service/openAIService';
 import {OPENAI_API_KEY} from '../config/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {Alert} from 'react-native';
 
 // REALISTIC exercise counts based on time
 const EXERCISE_COUNT_BY_DURATION: {[key: number]: number} = {
-  15: 4, // 3-4 exercises for 15 min
-  30: 6, // 5-6 exercises for 30 min
-  45: 8, // 7-8 exercises for 45 min
-  60: 10, // 9-10 exercises for 60 min
-  90: 12, // 11-12 exercises for 90 min
+  15: 2, // 3-4 exercises for 15 min
+  30: 3, // 5-6 exercises for 30 min
+  45: 4, // 7-8 exercises for 45 min
+  60: 5, // 9-10 exercises for 60 min
+  90: 6, // 11-12 exercises for 90 min
 };
 
 // Default user preferences if none are set
@@ -39,11 +40,11 @@ export async function generateWorkout(
     Math.min(Math.floor(duration / 7), 12); // Fallback: ~7 minutes per exercise, max 12
 
   // Always try AI first
-  if (useAI) {
+  if (true) {
     try {
       const storedKey = await AsyncStorage.getItem('openai_api_key');
       const apiKey = storedKey || OPENAI_API_KEY;
-
+      console.log('Using OpenAI API key:', apiKey);
       if (apiKey) {
         const openAIService = createOpenAIService(apiKey);
         const aiWorkout = await openAIService.generateWorkout({

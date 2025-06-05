@@ -1,6 +1,6 @@
 // screens/WorkoutPreviewScreen.tsx
 
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -10,16 +10,20 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Alert,
-  TextInput,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import {useNavigation, useRoute, RouteProp} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../App';
 import {WorkoutExercise, Exercise} from '../types/workout';
 import {generateWorkout} from '../utils/generateWorkout';
-import {colors} from '../themes/colors';
+import {colors, typography, spacing} from '../themes';
 import {exerciseService} from '../service/exerciseService';
 import ReplaceExerciseModal from '../components/workout/ReplaceExerciseModal';
+import Icon from 'react-native-vector-icons/Ionicons';
+
+const {width} = Dimensions.get('window');
 
 type WorkoutPreviewScreenRouteProp = RouteProp<
   RootStackParamList,
@@ -30,116 +34,60 @@ type WorkoutPreviewScreenNavigationProp = StackNavigationProp<
   'WorkoutPreview'
 >;
 
-interface WorkoutDescription {
-  summary: string;
-  reasoning: string;
-}
-
 export default function WorkoutPreviewScreen() {
   const navigation = useNavigation<WorkoutPreviewScreenNavigationProp>();
   const route = useRoute<WorkoutPreviewScreenRouteProp>();
-  const {duration, focusAreas, useAI} = route.params;
+  const {duration, focusAreas} = route.params;
 
   const [exercises, setExercises] = useState<WorkoutExercise[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [showReplaceModal, setShowReplaceModal] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [exerciseToReplace, setExerciseToReplace] = useState<number | null>(
     null,
   );
-  const [feedback, setFeedback] = useState('');
-  const [generationMethod, setGenerationMethod] = useState<'AI' | 'Standard'>(
-    'Standard',
-  );
-  const [workoutDescription, setWorkoutDescription] =
-    useState<WorkoutDescription>({
-      summary: '',
-      reasoning: '',
-    });
   const [error, setError] = useState<string | null>(null);
+
+  // Animations
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const buttonScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     generateInitialWorkout();
   }, []);
-
-  const generateWorkoutDescription = (
-    exercises: WorkoutExercise[],
-    method: 'AI' | 'Standard',
-  ) => {
-    if (exercises.length === 0) {
-      setWorkoutDescription({
-        summary: 'No exercises generated',
-        reasoning: 'Please try regenerating the workout.',
-      });
-      return;
-    }
-
-    // Analyze the workout
-    const muscleGroups = new Set<string>();
-    const equipment = new Set<string>();
-
-    exercises.forEach(ex => {
-      const fullExercise = exerciseService.getExerciseById(ex.id);
-      if (fullExercise) {
-        fullExercise.muscleGroups.primary.forEach(mg => muscleGroups.add(mg));
-        equipment.add(fullExercise.equipment);
-      }
-    });
-
-    const muscleGroupsArray = Array.from(muscleGroups);
-    const equipmentArray = Array.from(equipment);
-
-    // Create summary
-    let summary = `${exercises.length}-exercise `;
-    if (focusAreas && focusAreas.length > 0) {
-      summary += `${focusAreas.join(' & ')} focused `;
-    } else if (muscleGroupsArray.length > 2) {
-      summary += 'full-body ';
-    } else {
-      summary += `${muscleGroupsArray.slice(0, 2).join(' & ')} `;
-    }
-    summary += `workout using ${equipmentArray.slice(0, 2).join(' and ')}.`;
-
-    // Create reasoning
-    let reasoning =
-      method === 'AI'
-        ? '🤖 AI selected these exercises based on your preferences, balancing muscle groups and progressive difficulty.'
-        : '⚡ Exercises selected to provide a balanced workout with proven compound and isolation movements.';
-
-    setWorkoutDescription({summary, reasoning});
-  };
 
   const generateInitialWorkout = async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      if (!duration) {
-        throw new Error('Duration is required');
-      }
-
-      console.log('Generating workout with params:', {
-        duration,
-        focusAreas,
-        useAI,
-      });
-
       const generated = await generateWorkout(
         duration,
         undefined,
         focusAreas as any,
-        useAI,
+        true, // Always use AI
       );
 
       if (!generated || generated.length === 0) {
         throw new Error('No exercises were generated');
       }
 
-      console.log('Generated', generated.length, 'exercises');
       setExercises(generated);
-      setGenerationMethod(useAI ? 'AI' : 'Standard');
-      generateWorkoutDescription(generated, useAI ? 'AI' : 'Standard');
+
+      // Animate in
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start();
     } catch (error) {
       console.error('Error generating workout:', error);
       setError(
@@ -157,53 +105,16 @@ export default function WorkoutPreviewScreen() {
         duration,
         undefined,
         focusAreas as any,
-        useAI,
+        true,
       );
 
       if (generated && generated.length > 0) {
         setExercises(generated);
-        generateWorkoutDescription(generated, generationMethod);
       } else {
         throw new Error('No exercises generated');
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to regenerate workout.');
-    } finally {
-      setIsRegenerating(false);
-    }
-  };
-
-  const handleRegenerateWithFeedback = async () => {
-    if (!feedback.trim()) {
-      Alert.alert(
-        'Feedback Required',
-        'Please provide feedback for AI to improve the workout.',
-      );
-      return;
-    }
-
-    setIsRegenerating(true);
-    try {
-      const generated = await generateWorkout(
-        duration,
-        undefined,
-        focusAreas as any,
-        true, // Force AI for feedback-based generation
-        feedback,
-        exercises, // Pass current exercises for context
-      );
-
-      if (generated && generated.length > 0) {
-        setExercises(generated);
-        setFeedback('');
-        setGenerationMethod('AI');
-        generateWorkoutDescription(generated, 'AI');
-        Alert.alert('Success', 'Workout regenerated based on your feedback!');
-      } else {
-        throw new Error('No exercises generated with feedback');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to regenerate workout with feedback.');
     } finally {
       setIsRegenerating(false);
     }
@@ -226,7 +137,6 @@ export default function WorkoutPreviewScreen() {
           onPress: () => {
             const newExercises = exercises.filter((_, i) => i !== index);
             setExercises(newExercises);
-            generateWorkoutDescription(newExercises, generationMethod);
           },
         },
       ],
@@ -243,38 +153,29 @@ export default function WorkoutPreviewScreen() {
       const newExercises = [...exercises];
       newExercises[exerciseToReplace] = newExercise;
       setExercises(newExercises);
-      generateWorkoutDescription(newExercises, generationMethod);
     }
     setShowReplaceModal(false);
     setExerciseToReplace(null);
   };
 
-  const handleAddExercise = () => {
-    setShowAddModal(true);
-  };
-
-  const handleAddComplete = (newExercise: WorkoutExercise) => {
-    const newExercises = [...exercises, newExercise];
-    setExercises(newExercises);
-    generateWorkoutDescription(newExercises, generationMethod);
-    setShowAddModal(false);
-  };
-
   const handleStartWorkout = () => {
-    if (!exercises || exercises.length === 0) {
-      Alert.alert('Error', 'No exercises available to start workout.');
-      return;
-    }
-
-    console.log(
-      'Starting workout with',
-      exercises.length,
-      'exercises from preview',
-    );
-    navigation.navigate('Workout', {
-      duration,
-      exercises: exercises,
-      preGenerated: true,
+    Animated.sequence([
+      Animated.timing(buttonScale, {
+        toValue: 0.97,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(buttonScale, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      navigation.navigate('Workout', {
+        duration,
+        exercises: exercises,
+        preGenerated: true,
+      });
     });
   };
 
@@ -282,30 +183,30 @@ export default function WorkoutPreviewScreen() {
     return exercises.reduce((total, ex) => total + ex.sets.length, 0);
   };
 
-  const getEstimatedTime = () => {
-    // Estimate based on sets and rest time
-    const totalSets = getTotalSets();
-    const avgTimePerSet = 1.5; // minutes including rest
-    return Math.round(totalSets * avgTimePerSet);
+  const getMuscleGroups = () => {
+    const groups = new Set<string>();
+    exercises.forEach(ex => {
+      const exercise = exerciseService.getExerciseById(ex.id);
+      if (exercise) {
+        exercise.muscleGroups.primary.forEach(mg => groups.add(mg));
+      }
+    });
+    return Array.from(groups);
   };
 
-  // Loading state
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.secondary} />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>
-            {useAI
-              ? '🤖 AI is crafting your personalized workout...'
-              : 'Generating your workout...'}
+            Generating your perfect workout...
           </Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  // Error state
   if (error) {
     return (
       <SafeAreaView style={styles.container}>
@@ -313,12 +214,11 @@ export default function WorkoutPreviewScreen() {
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}>
-            <Text style={styles.backButtonText}>←</Text>
+            <Icon name="chevron-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.title}>Workout Error</Text>
-          <View style={styles.placeholder} />
         </View>
         <View style={styles.errorContainer}>
+          <Icon name="alert-circle-outline" size={64} color={colors.danger} />
           <Text style={styles.errorTitle}>Generation Failed</Text>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity
@@ -331,137 +231,138 @@ export default function WorkoutPreviewScreen() {
     );
   }
 
+  const muscleGroups = getMuscleGroups();
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <Animated.View
+        style={[
+          styles.header,
+          {
+            opacity: fadeAnim,
+            transform: [{translateY: slideAnim}],
+          },
+        ]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>←</Text>
+          <Icon name="chevron-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.title}>Preview Workout</Text>
-        <View style={styles.placeholder} />
-      </View>
+        <Text style={styles.title}>Your Workout</Text>
+        <TouchableOpacity
+          style={styles.regenerateButton}
+          onPress={handleRegenerate}
+          disabled={isRegenerating}>
+          <Icon
+            name="refresh"
+            size={20}
+            color={isRegenerating ? colors.textTertiary : colors.textPrimary}
+          />
+        </TouchableOpacity>
+      </Animated.View>
 
-      <ScrollView
-        style={styles.scrollView}
+      <Animated.ScrollView
+        style={[styles.scrollView, {opacity: fadeAnim}]}
         showsVerticalScrollIndicator={false}>
-        {/* Generation Info */}
-        <View style={styles.generationInfo}>
-          <View style={styles.generationBadge}>
-            <Text style={styles.generationIcon}>
-              {generationMethod === 'AI' ? '🤖' : '⚡'}
-            </Text>
-            <Text style={styles.generationText}>
-              {generationMethod} Generated
-            </Text>
+        {/* Workout Overview */}
+        <View style={styles.overview}>
+          <View style={styles.overviewRow}>
+            <View style={styles.overviewItem}>
+              <Text style={styles.overviewValue}>{duration}</Text>
+              <Text style={styles.overviewLabel}>minutes</Text>
+            </View>
+            <View style={styles.overviewDivider} />
+            <View style={styles.overviewItem}>
+              <Text style={styles.overviewValue}>{exercises.length}</Text>
+              <Text style={styles.overviewLabel}>exercises</Text>
+            </View>
+            <View style={styles.overviewDivider} />
+            <View style={styles.overviewItem}>
+              <Text style={styles.overviewValue}>{getTotalSets()}</Text>
+              <Text style={styles.overviewLabel}>total sets</Text>
+            </View>
           </View>
-          <Text style={styles.generationSubtext}>
-            ~{getEstimatedTime()} min • {exercises.length} exercises •{' '}
-            {getTotalSets()} total sets
-          </Text>
+
+          {muscleGroups.length > 0 && (
+            <View style={styles.muscleGroupsRow}>
+              {muscleGroups.slice(0, 4).map((mg, index) => (
+                <View key={index} style={styles.muscleTag}>
+                  <Text style={styles.muscleTagText}>
+                    {mg.replace('_', ' ')}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
-        {/* Workout Description */}
-        <View style={styles.descriptionContainer}>
-          <Text style={styles.descriptionSummary}>
-            {workoutDescription.summary}
-          </Text>
-          <Text style={styles.descriptionReasoning}>
-            {workoutDescription.reasoning}
-          </Text>
-        </View>
-
-        {/* Exercises List */}
-        <View style={styles.exercisesContainer}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Exercises</Text>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={handleAddExercise}>
-              <Text style={styles.addButtonText}>+ Add</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Exercise List */}
+        <View style={styles.exercisesSection}>
+          <Text style={styles.sectionTitle}>Exercises</Text>
 
           {exercises.map((exercise, index) => (
-            <View key={`${exercise.id}-${index}`} style={styles.exerciseCard}>
-              <View style={styles.exerciseHeader}>
-                <View style={styles.exerciseInfo}>
-                  <Text style={styles.exerciseNumber}>{index + 1}</Text>
-                  <View>
-                    <Text style={styles.exerciseName}>{exercise.name}</Text>
-                    <Text style={styles.exerciseDetails}>
-                      {exercise.sets.length} sets × {exercise.targetReps} reps
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.exerciseActions}>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => handleReplaceExercise(index)}>
-                    <Text style={styles.actionIcon}>🔄</Text>
-                  </TouchableOpacity>
+            <Animated.View
+              key={`${exercise.id}-${index}`}
+              style={[
+                styles.exerciseCard,
+                {
+                  opacity: fadeAnim,
+                  transform: [
+                    {
+                      translateY: fadeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [20, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}>
+              <View style={styles.exerciseNumber}>
+                <Text style={styles.exerciseNumberText}>{index + 1}</Text>
+              </View>
+
+              <View style={styles.exerciseContent}>
+                <Text style={styles.exerciseName}>{exercise.name}</Text>
+                <Text style={styles.exerciseDetails}>
+                  {exercise.sets.length} sets × {exercise.targetReps} reps
+                </Text>
+              </View>
+
+              <View style={styles.exerciseActions}>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => handleReplaceExercise(index)}>
+                  <Icon
+                    name="swap-horizontal"
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+                {exercises.length > 1 && (
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => handleRemoveExercise(index)}>
-                    <Text style={styles.actionIcon}>❌</Text>
+                    <Icon name="close" size={20} color={colors.textSecondary} />
                   </TouchableOpacity>
-                </View>
+                )}
               </View>
-            </View>
+            </Animated.View>
           ))}
         </View>
+      </Animated.ScrollView>
 
-        {/* AI Feedback Section */}
-        {useAI && (
-          <View style={styles.feedbackSection}>
-            <Text style={styles.sectionTitle}>AI Refinement</Text>
-            <TextInput
-              style={styles.feedbackInput}
-              placeholder="Tell AI how to improve this workout..."
-              placeholderTextColor={colors.textSecondary}
-              value={feedback}
-              onChangeText={setFeedback}
-              multiline
-              numberOfLines={3}
-            />
-            <TouchableOpacity
-              style={[
-                styles.feedbackButton,
-                isRegenerating && styles.buttonDisabled,
-              ]}
-              onPress={handleRegenerateWithFeedback}
-              disabled={isRegenerating}>
-              <Text style={styles.feedbackButtonText}>
-                {isRegenerating
-                  ? 'Regenerating...'
-                  : 'Regenerate with Feedback'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Action Buttons */}
-        <View style={styles.actionSection}>
-          <TouchableOpacity
-            style={[
-              styles.regenerateButton,
-              isRegenerating && styles.buttonDisabled,
-            ]}
-            onPress={handleRegenerate}
-            disabled={isRegenerating}>
-            <Text style={styles.regenerateButtonText}>
-              {isRegenerating ? 'Regenerating...' : '🔄 Regenerate All'}
-            </Text>
-          </TouchableOpacity>
-
+      {/* Start Button */}
+      <View style={styles.bottomContainer}>
+        <Animated.View
+          style={{transform: [{scale: buttonScale}], width: '100%'}}>
           <TouchableOpacity
             style={styles.startButton}
-            onPress={handleStartWorkout}>
+            onPress={handleStartWorkout}
+            activeOpacity={0.8}>
             <Text style={styles.startButtonText}>Start Workout</Text>
           </TouchableOpacity>
-        </View>
-      </ScrollView>
+        </Animated.View>
+      </View>
 
       {showReplaceModal && exerciseToReplace !== null && (
         <ReplaceExerciseModal
@@ -472,15 +373,6 @@ export default function WorkoutPreviewScreen() {
           }}
           onReplace={handleReplaceComplete}
           currentExerciseId={exercises[exerciseToReplace].id}
-        />
-      )}
-
-      {showAddModal && (
-        <ReplaceExerciseModal
-          visible={showAddModal}
-          onClose={() => setShowAddModal(false)}
-          onReplace={handleAddComplete}
-          currentExerciseId=""
         />
       )}
     </SafeAreaView>
@@ -498,248 +390,196 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    fontSize: 18,
-    color: colors.textPrimary,
-    marginTop: 20,
-    textAlign: 'center',
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.textSecondary,
+    marginTop: spacing.lg,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: spacing.xl,
   },
   errorTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.semibold,
     color: colors.textPrimary,
-    marginBottom: 12,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
   },
   errorText: {
-    fontSize: 16,
+    fontSize: typography.sizes.body,
     color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 22,
+    marginBottom: spacing.xl,
+    lineHeight: 24,
   },
   retryButton: {
-    backgroundColor: colors.secondary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: 12,
   },
   retryButtonText: {
     color: colors.buttonText,
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.semibold,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   backButton: {
-    padding: 8,
-  },
-  backButtonText: {
-    fontSize: 24,
-    color: colors.secondary,
-    fontWeight: 'bold',
+    padding: spacing.sm,
+    margin: -spacing.sm,
   },
   title: {
     flex: 1,
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: typography.sizes.headline,
+    fontWeight: typography.weights.semibold,
     color: colors.textPrimary,
     textAlign: 'center',
   },
-  placeholder: {
-    width: 40,
+  regenerateButton: {
+    padding: spacing.sm,
+    margin: -spacing.sm,
   },
   scrollView: {
     flex: 1,
   },
-  generationInfo: {
-    alignItems: 'center',
-    paddingTop: 20,
-    paddingBottom: 12,
-  },
-  generationBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.cardBackground,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginBottom: 8,
-  },
-  generationIcon: {
-    fontSize: 20,
-    marginRight: 8,
-  },
-  generationText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  generationSubtext: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  descriptionContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  descriptionSummary: {
-    fontSize: 16,
-    color: colors.textPrimary,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  descriptionReasoning: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontStyle: 'italic',
-  },
-  exercisesContainer: {
-    padding: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-  },
-  addButton: {
-    backgroundColor: colors.secondary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  addButtonText: {
-    color: colors.buttonText,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  exerciseCard: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+  overview: {
+    backgroundColor: colors.surface,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.xl,
+    borderRadius: 16,
+    padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  exerciseHeader: {
+  overviewRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  overviewItem: {
     alignItems: 'center',
   },
-  exerciseInfo: {
+  overviewValue: {
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.semibold,
+    color: colors.textPrimary,
+  },
+  overviewLabel: {
+    fontSize: typography.sizes.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  overviewDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: colors.border,
+  },
+  muscleGroupsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: spacing.lg,
+    gap: spacing.sm,
+  },
+  muscleTag: {
+    backgroundColor: colors.primaryDim,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 16,
+  },
+  muscleTagText: {
+    fontSize: typography.sizes.caption,
+    color: colors.primary,
+    fontWeight: typography.weights.medium,
+    textTransform: 'capitalize',
+  },
+  exercisesSection: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: 120,
+  },
+  sectionTitle: {
+    fontSize: typography.sizes.headline,
+    fontWeight: typography.weights.semibold,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  exerciseCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   exerciseNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.secondary,
-    marginRight: 12,
-    width: 30,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primaryDim,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  exerciseNumberText: {
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.semibold,
+    color: colors.primary,
+  },
+  exerciseContent: {
+    flex: 1,
   },
   exerciseName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.medium,
     color: colors.textPrimary,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   exerciseDetails: {
-    fontSize: 14,
+    fontSize: typography.sizes.caption,
     color: colors.textSecondary,
   },
   exerciseActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: spacing.xs,
   },
   actionButton: {
-    padding: 8,
+    padding: spacing.sm,
     borderRadius: 8,
-    backgroundColor: colors.inputBackground,
   },
-  actionIcon: {
-    fontSize: 16,
-  },
-  feedbackSection: {
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  feedbackInput: {
-    backgroundColor: colors.inputBackground,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: colors.textPrimary,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    marginBottom: 12,
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  feedbackButton: {
-    backgroundColor: colors.secondary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  feedbackButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.buttonText,
-  },
-  actionSection: {
-    padding: 20,
-    gap: 12,
-  },
-  regenerateButton: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  regenerateButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.secondary,
+  bottomContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
+    paddingTop: spacing.lg,
+    backgroundColor: colors.background,
   },
   startButton: {
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
     borderRadius: 12,
-    paddingVertical: 16,
     alignItems: 'center',
-    shadowColor: colors.secondary,
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowColor: colors.primary,
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
   },
   startButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: typography.sizes.bodyLarge,
+    fontWeight: typography.weights.semibold,
     color: colors.buttonText,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
+    letterSpacing: typography.letterSpacing.wide,
   },
 });

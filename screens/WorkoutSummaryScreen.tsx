@@ -1,6 +1,6 @@
 // screens/WorkoutSummaryScreen.tsx
 
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useRef} from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,14 @@ import {
   ScrollView,
   SafeAreaView,
   Share,
+  Animated,
 } from 'react-native';
 import {useNavigation, useRoute, RouteProp} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../App';
-import {colors} from '../themes/colors';
+import {colors, typography, spacing} from '../themes';
 import {Workout} from '../types/workout';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 type WorkoutSummaryScreenRouteProp = RouteProp<
   RootStackParamList,
@@ -30,20 +32,31 @@ export default function WorkoutSummaryScreen() {
   const route = useRoute<WorkoutSummaryScreenRouteProp>();
   const {workout} = route.params;
 
-  const [personalRecords, setPersonalRecords] = useState<string[]>([]);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
 
   useEffect(() => {
-    // Check for potential PRs (simplified - you might want more sophisticated logic)
-    const prs: string[] = [];
-    workout.exercises.forEach(exercise => {
-      const maxWeight = Math.max(...exercise.sets.map(set => set.weight || 0));
-      if (maxWeight > 0) {
-        // This is a simplified check - in reality you'd compare against historical data
-        prs.push(`${exercise.name}: ${maxWeight} lbs`);
-      }
-    });
-    setPersonalRecords(prs.slice(0, 3)); // Show top 3
-  }, [workout]);
+    // Entry animation
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 7,
+      }),
+    ]).start();
+  }, []);
 
   const getTotalVolume = () => {
     return workout.exercises.reduce((total, exercise) => {
@@ -73,29 +86,43 @@ export default function WorkoutSummaryScreen() {
     }, 0);
   };
 
-  const getWorkoutDuration = () => {
-    if (workout.timestamp && workout.completed) {
-      // Calculate actual duration based on start/end times
-      // For now, using the planned duration
-      return workout.duration;
-    }
-    return workout.duration;
+  const getTopExercises = () => {
+    return workout.exercises
+      .map(exercise => {
+        const totalVolume = exercise.sets.reduce(
+          (sum, set) => sum + (set.weight || 0) * (set.actual || 0),
+          0,
+        );
+        const maxWeight = Math.max(
+          ...exercise.sets.map(set => set.weight || 0),
+        );
+        return {
+          name: exercise.name,
+          sets: exercise.sets.filter(set => set.completed).length,
+          maxWeight,
+          totalVolume,
+        };
+      })
+      .sort((a, b) => b.totalVolume - a.totalVolume)
+      .slice(0, 3);
   };
 
   const handleShare = async () => {
+    const topExercises = getTopExercises();
     const summary =
-      `💪 Workout Complete!\n\n` +
-      `Duration: ${getWorkoutDuration()} minutes\n` +
+      `Workout Complete! 💪\n\n` +
+      `Duration: ${workout.duration} minutes\n` +
       `Exercises: ${workout.exercises.length}\n` +
-      `Sets: ${getTotalSets()}\n` +
-      `Reps: ${getTotalReps()}\n` +
-      `Volume: ${Math.round(getTotalVolume())} lbs\n\n` +
-      `Exercises:\n${workout.exercises.map(ex => `• ${ex.name}`).join('\n')}`;
+      `Total Sets: ${getTotalSets()}\n` +
+      `Total Reps: ${getTotalReps()}\n` +
+      `Volume: ${Math.round(getTotalVolume()).toLocaleString()} lbs\n\n` +
+      `Top Exercises:\n${topExercises
+        .map(ex => `• ${ex.name}: ${ex.maxWeight} lbs`)
+        .join('\n')}`;
 
     try {
       await Share.share({
         message: summary,
-        title: 'My Workout Summary',
       });
     } catch (error) {
       console.error('Error sharing workout:', error);
@@ -103,133 +130,145 @@ export default function WorkoutSummaryScreen() {
   };
 
   const handleDone = () => {
-    // Navigate back to the main tabs
     navigation.reset({
       index: 0,
       routes: [{name: 'MainTabs'}],
     });
   };
 
-  const handleStartAnother = () => {
-    // Navigate to workout select (which is the default tab)
-    navigation.reset({
-      index: 0,
-      routes: [{name: 'MainTabs'}],
-    });
-  };
+  const stats = [
+    {
+      value: workout.duration,
+      label: 'Minutes',
+      icon: 'time-outline',
+    },
+    {
+      value: getTotalSets(),
+      label: 'Sets',
+      icon: 'refresh-outline',
+    },
+    {
+      value: getTotalReps(),
+      label: 'Reps',
+      icon: 'repeat-outline',
+    },
+    {
+      value: `${Math.round(getTotalVolume() / 1000)}k`,
+      label: 'Volume',
+      icon: 'barbell-outline',
+    },
+  ];
+
+  const topExercises = getTopExercises();
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
+      <Animated.ScrollView
+        style={[styles.scrollView, {opacity: fadeAnim}]}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}>
         {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Workout Complete! 🎉</Text>
-          <Text style={styles.subtitle}>Great job crushing your workout</Text>
+        <Animated.View
+          style={[
+            styles.header,
+            {
+              transform: [{translateY: slideAnim}, {scale: scaleAnim}],
+            },
+          ]}>
+          <View style={styles.successIcon}>
+            <Icon name="checkmark-circle" size={80} color={colors.success} />
+          </View>
+          <Text style={styles.title}>Great Work!</Text>
+          <Text style={styles.subtitle}>
+            You've completed your {workout.duration} minute workout
+          </Text>
+        </Animated.View>
+
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          {stats.map((stat, index) => (
+            <Animated.View
+              key={stat.label}
+              style={[
+                styles.statCard,
+                {
+                  opacity: fadeAnim,
+                  transform: [
+                    {
+                      translateY: fadeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [20, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}>
+              <Icon name={stat.icon} size={24} color={colors.primary} />
+              <Text style={styles.statValue}>{stat.value}</Text>
+              <Text style={styles.statLabel}>{stat.label}</Text>
+            </Animated.View>
+          ))}
         </View>
 
-        {/* Key Stats */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{getWorkoutDuration()}</Text>
-            <Text style={styles.statLabel}>Minutes</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{workout.exercises.length}</Text>
-            <Text style={styles.statLabel}>Exercises</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{getTotalSets()}</Text>
-            <Text style={styles.statLabel}>Sets</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>
-              {Math.round(getTotalVolume())}
-            </Text>
-            <Text style={styles.statLabel}>lbs Volume</Text>
-          </View>
-        </View>
-
-        {/* Personal Records */}
-        {personalRecords.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>🏆 Strong Lifts Today</Text>
-            <View style={styles.prContainer}>
-              {personalRecords.map((pr, index) => (
-                <View key={index} style={styles.prCard}>
-                  <Text style={styles.prText}>{pr}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Exercise Breakdown */}
+        {/* Top Exercises */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Exercise Summary</Text>
-          <View style={styles.exercisesContainer}>
-            {workout.exercises.map((exercise, index) => {
-              const completedSets = exercise.sets.filter(
-                set => set.completed,
-              ).length;
-              const totalSets = exercise.sets.length;
-              const maxWeight = Math.max(
-                ...exercise.sets.map(set => set.weight || 0),
-              );
-              const totalReps = exercise.sets.reduce(
-                (sum, set) => sum + (set.actual || 0),
-                0,
-              );
+          <Text style={styles.sectionTitle}>Top Performances</Text>
+          {topExercises.map((exercise, index) => (
+            <View key={index} style={styles.exerciseRow}>
+              <View style={styles.exerciseRank}>
+                <Text style={styles.rankNumber}>{index + 1}</Text>
+              </View>
+              <View style={styles.exerciseInfo}>
+                <Text style={styles.exerciseName}>{exercise.name}</Text>
+                <Text style={styles.exerciseStats}>
+                  {exercise.sets} sets • Max: {exercise.maxWeight} lbs
+                </Text>
+              </View>
+              <Text style={styles.exerciseVolume}>
+                {Math.round(exercise.totalVolume).toLocaleString()} lbs
+              </Text>
+            </View>
+          ))}
+        </View>
 
-              return (
-                <View
-                  key={`${exercise.id}-${index}`}
-                  style={styles.exerciseCard}>
-                  <View style={styles.exerciseHeader}>
-                    <Text style={styles.exerciseName}>{exercise.name}</Text>
-                    <Text style={styles.exerciseCompletion}>
-                      {completedSets}/{totalSets} sets
-                    </Text>
-                  </View>
-                  <View style={styles.exerciseStats}>
-                    <Text style={styles.exerciseStat}>
-                      Max: {maxWeight > 0 ? `${maxWeight} lbs` : 'Bodyweight'}
-                    </Text>
-                    <Text style={styles.exerciseStat}>
-                      Total Reps: {totalReps}
-                    </Text>
-                  </View>
+        {/* Exercise Summary */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>All Exercises</Text>
+          {workout.exercises.map((exercise, index) => {
+            const completedSets = exercise.sets.filter(
+              set => set.completed,
+            ).length;
+            const volume = exercise.sets.reduce(
+              (sum, set) => sum + (set.weight || 0) * (set.actual || 0),
+              0,
+            );
+
+            return (
+              <View key={`${exercise.id}-${index}`} style={styles.summaryCard}>
+                <Text style={styles.summaryName}>{exercise.name}</Text>
+                <View style={styles.summaryStats}>
+                  <Text style={styles.summaryStat}>
+                    {completedSets}/{exercise.sets.length} sets
+                  </Text>
+                  <View style={styles.summaryDot} />
+                  <Text style={styles.summaryStat}>
+                    {Math.round(volume).toLocaleString()} lbs
+                  </Text>
                 </View>
-              );
-            })}
-          </View>
+              </View>
+            );
+          })}
         </View>
-
-        {/* Achievement Badge */}
-        <View style={styles.achievementContainer}>
-          <View style={styles.achievementBadge}>
-            <Text style={styles.achievementIcon}>💪</Text>
-            <Text style={styles.achievementText}>Consistency is Key</Text>
-          </View>
-        </View>
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Action Buttons */}
-      <View style={styles.actionContainer}>
+      <View style={styles.bottomContainer}>
         <TouchableOpacity
           style={styles.shareButton}
           onPress={handleShare}
           activeOpacity={0.8}>
-          <Text style={styles.shareButtonText}>📤 Share</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.anotherButton}
-          onPress={handleStartAnother}
-          activeOpacity={0.8}>
-          <Text style={styles.anotherButtonText}>Start Another</Text>
+          <Icon name="share-outline" size={20} color={colors.textPrimary} />
+          <Text style={styles.shareButtonText}>Share</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -252,179 +291,178 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 20,
+    paddingBottom: 100,
   },
   header: {
     alignItems: 'center',
-    paddingVertical: 30,
-    paddingHorizontal: 20,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.lg,
+  },
+  successIcon: {
+    marginBottom: spacing.lg,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: typography.sizes.display,
+    fontWeight: typography.weights.bold,
     color: colors.textPrimary,
-    marginBottom: 8,
-    textAlign: 'center',
+    marginBottom: spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: typography.sizes.body,
     color: colors.textSecondary,
     textAlign: 'center',
   },
-  statsContainer: {
+  statsGrid: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 30,
-    gap: 10,
+    flexWrap: 'wrap',
+    paddingHorizontal: spacing.md,
+    gap: spacing.md,
+    marginBottom: spacing.xl,
   },
   statCard: {
     flex: 1,
-    backgroundColor: colors.cardBackground,
-    borderRadius: 12,
-    padding: 16,
+    minWidth: '45%',
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: spacing.lg,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
   },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.secondary,
-    marginBottom: 4,
+  statValue: {
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.semibold,
+    color: colors.textPrimary,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: typography.sizes.caption,
     color: colors.textSecondary,
-    textAlign: 'center',
   },
   section: {
-    paddingHorizontal: 20,
-    marginBottom: 30,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.xl,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: typography.sizes.headline,
+    fontWeight: typography.weights.semibold,
     color: colors.textPrimary,
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
-  prContainer: {
-    gap: 8,
-  },
-  prCard: {
-    backgroundColor: colors.secondary,
-    borderRadius: 8,
-    padding: 12,
+  exerciseRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  prText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.buttonText,
-  },
-  exercisesContainer: {
-    gap: 12,
-  },
-  exerciseCard: {
-    backgroundColor: colors.cardBackground,
+    backgroundColor: colors.surface,
     borderRadius: 12,
-    padding: 16,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  exerciseHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  exerciseRank: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginRight: spacing.md,
   },
-  exerciseName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textPrimary,
+  rankNumber: {
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.semibold,
+    color: colors.buttonText,
+  },
+  exerciseInfo: {
     flex: 1,
   },
-  exerciseCompletion: {
-    fontSize: 14,
-    color: colors.secondary,
-    fontWeight: '500',
+  exerciseName: {
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.medium,
+    color: colors.textPrimary,
+    marginBottom: 2,
   },
   exerciseStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  exerciseStat: {
-    fontSize: 14,
+    fontSize: typography.sizes.caption,
     color: colors.textSecondary,
   },
-  achievementContainer: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 20,
+  exerciseVolume: {
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.semibold,
+    color: colors.primary,
   },
-  achievementBadge: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.secondary,
+  summaryCard: {
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  achievementIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  achievementText: {
-    fontSize: 16,
-    fontWeight: '600',
+  summaryName: {
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.medium,
     color: colors.textPrimary,
+    marginBottom: spacing.xs,
   },
-  actionContainer: {
+  summaryStats: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    gap: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    alignItems: 'center',
+  },
+  summaryStat: {
+    fontSize: typography.sizes.caption,
+    color: colors.textSecondary,
+  },
+  summaryDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: colors.textTertiary,
+    marginHorizontal: spacing.sm,
+  },
+  bottomContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
+    paddingTop: spacing.md,
+    backgroundColor: colors.background,
+    gap: spacing.md,
   },
   shareButton: {
     flex: 1,
-    backgroundColor: colors.cardBackground,
-    borderRadius: 12,
-    paddingVertical: 14,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    paddingVertical: spacing.md,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
+    gap: spacing.sm,
   },
   shareButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.medium,
     color: colors.textPrimary,
   },
-  anotherButton: {
-    flex: 1,
-    backgroundColor: colors.cardBackground,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.secondary,
-  },
-  anotherButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.secondary,
-  },
   doneButton: {
-    flex: 1,
-    backgroundColor: colors.secondary,
+    flex: 2,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
     borderRadius: 12,
-    paddingVertical: 14,
     alignItems: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   doneButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: typography.sizes.bodyLarge,
+    fontWeight: typography.weights.semibold,
     color: colors.buttonText,
   },
 });

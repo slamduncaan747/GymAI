@@ -1,15 +1,7 @@
-// components/workout/ExerciseCard.tsx (Redesigned)
-import React, {useState, useRef, useEffect} from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Animated,
-  LayoutAnimation,
-  Platform,
-  UIManager,
-} from 'react-native';
+// components/workout/ExerciseCard.tsx
+
+import React, {useState} from 'react';
+import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../../App';
@@ -18,16 +10,8 @@ import {useWorkout} from '../../context/WorkoutContext';
 import SwipeableSetRow from './SwipableSetRow';
 import RestTimeModal from './RestTimeModal';
 import ExerciseOptionsModal from './ExerciseOptionsModal';
-import Card from '../common/Card';
-import {colors, typography, spacing, shadows} from '../../themes';
-
-// Enable LayoutAnimation on Android
-if (
-  Platform.OS === 'android' &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+import {colors, typography, spacing} from '../../themes';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 type ExerciseCardNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -66,8 +50,6 @@ const ExerciseCard: React.FC<ExerciseCardProps> = React.memo(
     const [showRestModal, setShowRestModal] = useState(false);
     const [showOptionsModal, setShowOptionsModal] = useState(false);
     const [restTime, setRestTime] = useState(exercise.restTime || 60);
-    const [isExpanded, setIsExpanded] = useState(true);
-    const rotateAnim = useRef(new Animated.Value(1)).current;
 
     const handleSetUpdate = (
       setIndex: number,
@@ -88,7 +70,6 @@ const ExerciseCard: React.FC<ExerciseCardProps> = React.memo(
     };
 
     const addSet = () => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       const lastSet = exercise.sets[exercise.sets.length - 1];
       const newSet: WorkoutSet = {
         target: lastSet?.target || exercise.targetReps || 8,
@@ -99,30 +80,8 @@ const ExerciseCard: React.FC<ExerciseCardProps> = React.memo(
       addSetToExercise(exerciseIndex, newSet);
     };
 
-    const toggleExpanded = () => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setIsExpanded(!isExpanded);
-
-      Animated.timing(rotateAnim, {
-        toValue: isExpanded ? 0 : 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    };
-
-    const formatRestTime = (seconds: number) => {
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      return mins === 0
-        ? `${secs}s`
-        : secs === 0
-        ? `${mins}min`
-        : `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-
     const handleSetDelete = (setIndex: number) => {
       if (exercise.sets.length > 1) {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         removeSetFromExercise(exerciseIndex, setIndex);
       }
     };
@@ -143,19 +102,11 @@ const ExerciseCard: React.FC<ExerciseCardProps> = React.memo(
     const totalSets = exercise.sets.length;
     const progress = totalSets > 0 ? completedSets / totalSets : 0;
 
-    const spin = rotateAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['0deg', '180deg'],
-    });
-
     return (
-      <Card style={styles.card} noPadding variant="elevated">
+      <View style={styles.card}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.headerLeft}
-            onPress={toggleExpanded}
-            activeOpacity={0.7}>
+          <View style={styles.headerLeft}>
             <View style={styles.exerciseNumber}>
               <Text style={styles.exerciseNumberText}>{exerciseIndex + 1}</Text>
             </View>
@@ -173,79 +124,66 @@ const ExerciseCard: React.FC<ExerciseCardProps> = React.memo(
                 <TouchableOpacity
                   onPress={() => setShowRestModal(true)}
                   activeOpacity={0.7}>
-                  <Text style={styles.restTime}>
-                    Rest: {formatRestTime(restTime)}
-                  </Text>
+                  <Text style={styles.restTime}>Rest: {restTime}s</Text>
                 </TouchableOpacity>
               </View>
             </View>
-          </TouchableOpacity>
-
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={() => setShowOptionsModal(true)}
-              activeOpacity={0.7}>
-              <Text style={styles.menuIcon}>⋯</Text>
-            </TouchableOpacity>
-            <Animated.View style={{transform: [{rotate: spin}]}}>
-              <TouchableOpacity
-                style={styles.expandButton}
-                onPress={toggleExpanded}
-                activeOpacity={0.7}>
-                <Text style={styles.expandIcon}>⌄</Text>
-              </TouchableOpacity>
-            </Animated.View>
           </View>
+
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => setShowOptionsModal(true)}
+            activeOpacity={0.7}>
+            <Icon
+              name="ellipsis-horizontal"
+              size={20}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
         </View>
 
         {/* Progress Bar */}
         <View style={styles.progressContainer}>
           <View style={styles.progressBar}>
-            <Animated.View
-              style={[
-                styles.progressFill,
-                {
-                  width: `${progress * 100}%`,
-                },
-              ]}
+            <View
+              style={[styles.progressFill, {width: `${progress * 100}%`}]}
             />
           </View>
         </View>
 
         {/* Sets */}
-        {isExpanded && (
-          <View style={styles.setsContainer}>
-            <View style={styles.setsHeader}>
-              <Text style={[styles.headerText, {flex: 1}]}>WEIGHT</Text>
-              <Text style={[styles.headerText, {flex: 0.8}]}>REPS</Text>
-              <View style={{width: 40}} />
-            </View>
-
-            {exercise.sets.map((set, index) => (
-              <SwipeableSetRow
-                key={index}
-                setNumber={index + 1}
-                set={set}
-                onUpdate={(actual, weight, completed) =>
-                  handleSetUpdate(index, actual, weight, completed)
-                }
-                onDelete={() => handleSetDelete(index)}
-                previousSet={index > 0 ? exercise.sets[index - 1] : undefined}
-                restTime={restTime}
-                canDelete={exercise.sets.length > 1}
-              />
-            ))}
-
-            <TouchableOpacity
-              style={styles.addSetButton}
-              onPress={addSet}
-              activeOpacity={0.7}>
-              <Text style={styles.addSetIcon}>+</Text>
-              <Text style={styles.addSetText}>Add Set</Text>
-            </TouchableOpacity>
+        <View style={styles.setsContainer}>
+          <View style={styles.setsHeader}>
+            <Text style={[styles.headerText, {flex: 0.8}]}>SET</Text>
+            <Text style={[styles.headerText, {flex: 1.2}]}>PREVIOUS</Text>
+            <Text style={styles.headerText}>WEIGHT</Text>
+            <Text style={styles.headerText}>REPS</Text>
+            <View style={{width: 40}} />
           </View>
-        )}
+
+          {exercise.sets.map((set, index) => (
+            <SwipeableSetRow
+              key={index}
+              setNumber={index + 1}
+              set={set}
+              onUpdate={(actual, weight, completed) =>
+                handleSetUpdate(index, actual, weight, completed)
+              }
+              onDelete={() => handleSetDelete(index)}
+              previousSet={index > 0 ? exercise.sets[index - 1] : undefined}
+              restTime={restTime}
+              canDelete={exercise.sets.length > 1}
+            />
+          ))}
+
+          <TouchableOpacity
+            style={styles.addSetButton}
+            onPress={addSet}
+            activeOpacity={0.7}>
+            <Icon name="add" size={20} color={colors.primary} />
+            <Text style={styles.addSetText}>Add Set</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Modals */}
         <RestTimeModal
@@ -264,15 +202,19 @@ const ExerciseCard: React.FC<ExerciseCardProps> = React.memo(
           onReplace={() => onReplaceRequest?.(exerciseIndex)}
           onRemove={() => onRemoveExercise?.(exerciseIndex)}
         />
-      </Card>
+      </View>
     );
   },
 );
 
 const styles = StyleSheet.create({
   card: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
     marginBottom: spacing.md,
-    overflow: 'visible',
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',
@@ -286,25 +228,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   exerciseNumber: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary + '20',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primaryDim,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,
   },
   exerciseNumberText: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold,
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.semibold,
     color: colors.primary,
   },
   exerciseInfo: {
     flex: 1,
   },
   exerciseName: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.semibold,
+    fontSize: typography.sizes.bodyLarge,
+    fontWeight: typography.weights.medium,
     color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
@@ -313,55 +255,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   setCount: {
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.caption,
     color: colors.textSecondary,
   },
   dot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
     backgroundColor: colors.textTertiary,
     marginHorizontal: spacing.sm,
   },
   restTime: {
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.caption,
     color: colors.primary,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   menuButton: {
     padding: spacing.sm,
-    marginRight: spacing.xs,
-  },
-  menuIcon: {
-    fontSize: 20,
-    color: colors.textSecondary,
-    fontWeight: typography.weights.bold,
-  },
-  expandButton: {
-    padding: spacing.sm,
-  },
-  expandIcon: {
-    fontSize: 20,
-    color: colors.textSecondary,
-    fontWeight: typography.weights.bold,
   },
   progressContainer: {
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
   },
   progressBar: {
-    height: 4,
+    height: 3,
     backgroundColor: colors.border,
-    borderRadius: 2,
+    borderRadius: 1.5,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     backgroundColor: colors.primary,
-    borderRadius: 2,
+    borderRadius: 1.5,
   },
   setsContainer: {
     borderTopWidth: 1,
@@ -372,33 +296,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    backgroundColor: colors.background + '50',
+    backgroundColor: colors.background,
   },
   headerText: {
-    fontSize: typography.sizes.xs,
+    flex: 1,
+    fontSize: typography.sizes.micro,
     fontWeight: typography.weights.semibold,
     color: colors.textTertiary,
+    letterSpacing: typography.letterSpacing.wider,
     textAlign: 'center',
-    letterSpacing: 1,
   },
   addSetButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  addSetIcon: {
-    fontSize: 20,
-    color: colors.primary,
-    marginRight: spacing.sm,
-    fontWeight: typography.weights.bold,
-  },
   addSetText: {
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.semibold,
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.medium,
     color: colors.primary,
+    marginLeft: spacing.xs,
   },
 });
 

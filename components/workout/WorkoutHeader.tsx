@@ -1,3 +1,5 @@
+// components/workout/WorkoutHeader.tsx
+
 import React, {useEffect, useState} from 'react';
 import {
   View,
@@ -9,7 +11,8 @@ import {
 import {useWorkout} from '../../context/WorkoutContext';
 import {WorkoutExercise} from '../../types/workout';
 import {useNavigation} from '@react-navigation/native';
-import {colors} from '../../themes/colors'; // Import the colors file
+import {colors, typography, spacing} from '../../themes';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 const WorkoutHeader: React.FC = () => {
   const {currentWorkout, completeWorkout} = useWorkout();
@@ -30,8 +33,16 @@ const WorkoutHeader: React.FC = () => {
   }, [currentWorkout]);
 
   const formatElapsedTime = (seconds: number): string => {
-    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
     const remainingSeconds = seconds % 60;
+
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${remainingSeconds
+        .toString()
+        .padStart(2, '0')}`;
+    }
+
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds
       .toString()
       .padStart(2, '0')}`;
@@ -69,48 +80,65 @@ const WorkoutHeader: React.FC = () => {
 
   if (!currentWorkout) {
     return (
-      <SafeAreaView style={styles.header}>
-        <Text style={styles.title}>No Active Workout</Text>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <Text style={styles.title}>No Active Workout</Text>
+        </View>
       </SafeAreaView>
     );
   }
 
-  const handleFinish = async () => {
-    await completeWorkout();
-    navigation.goBack();
-  };
+  const progress = total > 0 ? completed / total : 0;
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}>
-          <Text style={styles.backText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Active Workout</Text>
-        <TouchableOpacity onPress={handleFinish} style={styles.finishButton}>
-          <Text style={styles.finishText}>Finish</Text>
-        </TouchableOpacity>
+        <View style={styles.topRow}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}>
+            <Icon name="chevron-back" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+
+          <View style={styles.timerContainer}>
+            <Icon name="time-outline" size={16} color={colors.textSecondary} />
+            <Text style={styles.timer}>{formatElapsedTime(elapsedTime)}</Text>
+          </View>
+
+          <TouchableOpacity style={styles.menuButton}>
+            <Icon
+              name="ellipsis-vertical"
+              size={20}
+              color={colors.textPrimary}
+            />
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Time</Text>
-            <Text style={styles.statValue}>
-              {formatElapsedTime(elapsedTime)}
-            </Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Volume</Text>
-            <Text style={styles.statValue}>
-              {Math.round(calculateVolume())} lbs
-            </Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Sets</Text>
             <Text style={styles.statValue}>
               {completed}/{total}
             </Text>
+            <Text style={styles.statLabel}>Sets</Text>
           </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>
+              {currentWorkout.exercises.length}
+            </Text>
+            <Text style={styles.statLabel}>Exercises</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>
+              {Math.round(calculateVolume())}
+            </Text>
+            <Text style={styles.statLabel}>Volume (lbs)</Text>
+          </View>
+        </View>
+
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, {width: `${progress * 100}%`}]} />
         </View>
       </View>
     </SafeAreaView>
@@ -123,58 +151,79 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: colors.background,
-    paddingVertical: 12,
-    paddingHorizontal: 15,
+    paddingBottom: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    flexDirection: 'column',
+  },
+  topRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
   backButton: {
-    position: 'absolute',
-    left: 10,
-    top: 12,
-    padding: 5,
+    padding: spacing.xs,
   },
-  backText: {
+  timerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 20,
+    gap: spacing.xs,
+  },
+  timer: {
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.medium,
     color: colors.textPrimary,
-    fontSize: 18,
+    fontVariant: ['tabular-nums'],
   },
-  finishButton: {
-    position: 'absolute',
-    right: 10,
-    top: 12,
-    padding: 5,
-  },
-  finishText: {
-    color: colors.finish,
-    fontSize: 16,
-    fontWeight: '600',
+  menuButton: {
+    padding: spacing.xs,
   },
   title: {
     color: colors.textPrimary,
-    fontWeight: 'bold',
-    fontSize: 20,
-    marginBottom: 8,
+    fontWeight: typography.weights.bold,
+    fontSize: typography.sizes.headline,
+    textAlign: 'center',
   },
   statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    paddingHorizontal: 10,
+    justifyContent: 'space-around',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   statItem: {
+    flex: 1,
     alignItems: 'center',
-  },
-  statLabel: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '500',
   },
   statValue: {
     color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: typography.sizes.headline,
+    fontWeight: typography.weights.semibold,
+    fontVariant: ['tabular-nums'],
+  },
+  statLabel: {
+    color: colors.textSecondary,
+    fontSize: typography.sizes.caption,
+    marginTop: 2,
+  },
+  statDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: colors.border,
+    alignSelf: 'center',
+  },
+  progressBar: {
+    height: 3,
+    backgroundColor: colors.border,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
   },
 });
 

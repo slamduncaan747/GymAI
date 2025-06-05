@@ -1,6 +1,6 @@
 // App.tsx
 
-import React, {useEffect} from 'react';
+import React from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
@@ -11,11 +11,11 @@ import WorkoutSelectScreen from './screens/WorkoutSelectScreen';
 import WorkoutPreviewScreen from './screens/WorkoutPreviewScreen';
 import WorkoutScreen from './screens/WorkoutScreen';
 import WorkoutSummaryScreen from './screens/WorkoutSummaryScreen';
-import SettingsScreen from './screens/SettingsScreen';
 import ExercisePreviewScreen from './components/workout/ExercisePreviewScreen';
 import {WorkoutExercise, Workout} from './types/workout';
 import {colors} from './themes/colors';
 import Icon from 'react-native-vector-icons/Ionicons';
+import {View, StyleSheet} from 'react-native';
 
 // Ensure icon font is loaded
 Icon.loadFont();
@@ -26,12 +26,10 @@ export type RootStackParamList = {
   WorkoutPreview: {
     duration: number;
     focusAreas?: string[];
-    useAI?: boolean;
   };
   Workout: {
     duration: number;
     focusAreas?: string[];
-    useAI?: boolean;
     exercises?: WorkoutExercise[];
     preGenerated?: boolean;
   };
@@ -42,14 +40,12 @@ export type RootStackParamList = {
     exerciseName: string;
     exerciseId: string;
   };
-  Settings: undefined;
 };
 
 export type TabParamList = {
-  WorkoutTab: undefined;
   Progress: undefined;
+  Workout: undefined;
   History: undefined;
-  Profile: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -58,41 +54,64 @@ const Tab = createBottomTabNavigator<TabParamList>();
 function MainTabs() {
   return (
     <Tab.Navigator
-      initialRouteName="WorkoutTab"
+      initialRouteName="Workout"
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.tabBarBackground,
-          borderTopColor: colors.tabBarBorder,
-          borderTopWidth: 1,
-          paddingBottom: 5,
-          paddingTop: 5,
-          height: 88,
+          backgroundColor: colors.background,
+          borderTopColor: 'transparent',
+          borderTopWidth: 0,
+          height: 65,
+          paddingBottom: 8,
+          paddingTop: 8,
+          elevation: 0,
+          shadowOpacity: 0,
         },
-        tabBarActiveTintColor: colors.tabIconActive,
-        tabBarInactiveTintColor: colors.tabIconInactive,
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-          marginTop: 4,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textTertiary,
+        tabBarShowLabel: false,
+        tabBarItemStyle: {
+          paddingVertical: 8,
         },
       }}>
-      <Tab.Screen
-        name="WorkoutTab"
-        component={WorkoutSelectScreen}
-        options={{
-          tabBarLabel: 'Workout',
-          tabBarIcon: ({color, size}) => (
-            <Icon name="barbell" size={26} color={color} />
-          ),
-        }}
-      />
       <Tab.Screen
         name="Progress"
         component={HomeScreen}
         options={{
-          tabBarIcon: ({color, size}) => (
-            <Icon name="trending-up" size={26} color={color} />
+          tabBarIcon: ({color, focused}) => (
+            <View style={styles.tabIconContainer}>
+              <Icon
+                name={focused ? 'trending-up' : 'trending-up-outline'}
+                size={24}
+                color={color}
+              />
+              {focused && (
+                <View
+                  style={[styles.activeIndicator, {backgroundColor: color}]}
+                />
+              )}
+            </View>
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Workout"
+        component={WorkoutSelectScreen}
+        options={{
+          tabBarIcon: ({color, focused}) => (
+            <View style={styles.tabIconContainer}>
+              <View
+                style={[
+                  styles.centerTabButton,
+                  focused && styles.centerTabButtonActive,
+                ]}>
+                <Icon
+                  name="add"
+                  size={28}
+                  color={focused ? colors.buttonText : colors.textPrimary}
+                />
+              </View>
+            </View>
           ),
         }}
       />
@@ -100,17 +119,19 @@ function MainTabs() {
         name="History"
         component={HistoryScreen}
         options={{
-          tabBarIcon: ({color, size}) => (
-            <Icon name="calendar" size={26} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={SettingsScreen}
-        options={{
-          tabBarIcon: ({color, size}) => (
-            <Icon name="person" size={26} color={color} />
+          tabBarIcon: ({color, focused}) => (
+            <View style={styles.tabIconContainer}>
+              <Icon
+                name={focused ? 'time' : 'time-outline'}
+                size={24}
+                color={color}
+              />
+              {focused && (
+                <View
+                  style={[styles.activeIndicator, {backgroundColor: color}]}
+                />
+              )}
+            </View>
           ),
         }}
       />
@@ -126,6 +147,11 @@ export default function App() {
           initialRouteName="MainTabs"
           screenOptions={{
             headerShown: false,
+            cardStyleInterpolator: ({current: {progress}}) => ({
+              cardStyle: {
+                opacity: progress,
+              },
+            }),
           }}>
           <Stack.Screen name="MainTabs" component={MainTabs} />
           <Stack.Screen name="WorkoutSelect" component={WorkoutSelectScreen} />
@@ -145,9 +171,40 @@ export default function App() {
             name="ExercisePreview"
             component={ExercisePreviewScreen}
           />
-          <Stack.Screen name="Settings" component={SettingsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </WorkoutProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  tabIconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 60,
+    height: 40,
+  },
+  activeIndicator: {
+    position: 'absolute',
+    bottom: -12,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  centerTabButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: colors.shadow,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  centerTabButtonActive: {
+    backgroundColor: colors.primary,
+  },
+});

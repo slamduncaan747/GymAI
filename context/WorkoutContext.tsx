@@ -148,9 +148,21 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
         ...prevWorkout,
         exercises: prevWorkout.exercises.map((exercise, exIndex) => {
           if (exIndex === exerciseIndex) {
+            // Create new array with the set removed
+            const newSets = exercise.sets.filter(
+              (_, sIndex) => sIndex !== setIndex,
+            );
+
+            // Preserve target reps from deleted set if needed
+            const deletedSet = exercise.sets[setIndex];
+
             return {
               ...exercise,
-              sets: exercise.sets.filter((_, sIndex) => sIndex !== setIndex),
+              sets: newSets.map((set, index) => ({
+                ...set,
+                // Optionally preserve target reps pattern
+                target: set.target || deletedSet.target || exercise.targetReps,
+              })),
             };
           }
           return exercise;

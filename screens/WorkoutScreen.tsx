@@ -1,6 +1,6 @@
 // screens/WorkoutScreen.tsx
 
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useRef} from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   Alert,
   ActivityIndicator,
   BackHandler,
+  Animated,
+  SafeAreaView,
 } from 'react-native';
 import {
   useNavigation,
@@ -26,8 +28,9 @@ import WorkoutHeader from '../components/workout/WorkoutHeader';
 import TimerModal from '../components/workout/TimerModal';
 import ReorderExercisesModal from '../components/workout/ReorderExerciseModal';
 import ReplaceExerciseModal from '../components/workout/ReplaceExerciseModal';
-import {colors} from '../themes/colors';
+import {colors, typography, spacing} from '../themes';
 import {WorkoutExercise} from '../types/workout';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 type WorkoutScreenRouteProp = RouteProp<RootStackParamList, 'Workout'>;
 type WorkoutScreenNavigationProp = StackNavigationProp<
@@ -46,7 +49,6 @@ export default function WorkoutScreen() {
   const {
     duration,
     focusAreas,
-    useAI = false,
     exercises: preGeneratedExercises,
     preGenerated = false,
   } = route.params || {};
@@ -72,6 +74,10 @@ export default function WorkoutScreen() {
   );
   const [error, setError] = useState<string | null>(null);
 
+  // Animations
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
   // Handle back button press
   useFocusEffect(
     React.useCallback(() => {
@@ -91,14 +97,6 @@ export default function WorkoutScreen() {
     }, [currentWorkout]),
   );
 
-  // Override navigation back button
-  React.useLayoutEffect(() => {
-    navigation.setOptions({
-      headerLeft: () => null,
-      gestureEnabled: false,
-    });
-  }, [navigation]);
-
   useEffect(() => {
     initializeWorkout();
   }, []);
@@ -108,11 +106,6 @@ export default function WorkoutScreen() {
       setIsLoading(true);
       setError(null);
 
-      // Validate required parameters
-      if (!duration) {
-        throw new Error('Duration is required');
-      }
-
       let exercisesToUse: WorkoutExercise[] = [];
 
       if (
@@ -120,18 +113,13 @@ export default function WorkoutScreen() {
         preGeneratedExercises &&
         preGeneratedExercises.length > 0
       ) {
-        console.log(
-          'Using pre-generated exercises:',
-          preGeneratedExercises.length,
-        );
         exercisesToUse = preGeneratedExercises;
       } else {
-        console.log('Generating new workout...');
         exercisesToUse = await generateWorkout(
           duration,
           undefined,
           focusAreas as any,
-          useAI,
+          true,
         );
       }
 
@@ -139,8 +127,21 @@ export default function WorkoutScreen() {
         throw new Error('No exercises were generated');
       }
 
-      console.log('Starting workout with', exercisesToUse.length, 'exercises');
       startWorkout(duration, exercisesToUse);
+
+      // Animate in
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start();
     } catch (error) {
       console.error('Error initializing workout:', error);
       setError(
@@ -168,10 +169,6 @@ export default function WorkoutScreen() {
         },
       ],
     );
-  };
-
-  const handleTimerFinished = () => {
-    setActiveTimer(null);
   };
 
   const handleCompleteWorkout = async () => {
@@ -215,7 +212,6 @@ export default function WorkoutScreen() {
   ) => {
     updateExerciseSet(exerciseIndex, setIndex, actual, weight, completed);
 
-    // Only start timer if set is completed and restTime is provided
     if (completed && restTime) {
       setActiveTimer({
         exerciseIndex,
@@ -230,7 +226,6 @@ export default function WorkoutScreen() {
   };
 
   const handleReplaceRequest = (exerciseIndex: number) => {
-    console.log('Replace requested for exercise index:', exerciseIndex);
     setExerciseToReplace(exerciseIndex);
     setShowReplaceModal(true);
   };
@@ -264,7 +259,6 @@ export default function WorkoutScreen() {
   };
 
   const handleReplaceComplete = (newExercise: WorkoutExercise) => {
-    console.log('Replacing exercise at index:', exerciseToReplace);
     if (exerciseToReplace !== null) {
       replaceExercise(exerciseToReplace, newExercise);
     }
@@ -272,45 +266,47 @@ export default function WorkoutScreen() {
     setExerciseToReplace(null);
   };
 
-  // Loading state
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.secondary} />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Starting your workout...</Text>
       </View>
     );
   }
 
-  // Error state
   if (error) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorTitle}>Workout Error</Text>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => navigation.goBack()}>
-          <Text style={styles.retryButtonText}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Icon name="alert-circle-outline" size={64} color={colors.danger} />
+          <Text style={styles.errorTitle}>Workout Error</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => navigation.goBack()}>
+            <Text style={styles.retryButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
-  // No workout state
   if (!currentWorkout) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorTitle}>No Active Workout</Text>
-        <Text style={styles.errorText}>
-          Unable to load workout. Please try creating a new one.
-        </Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => navigation.navigate('MainTabs')}>
-          <Text style={styles.retryButtonText}>Go Home</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorTitle}>No Active Workout</Text>
+          <Text style={styles.errorText}>
+            Unable to load workout. Please try creating a new one.
+          </Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => navigation.navigate('MainTabs')}>
+            <Text style={styles.retryButtonText}>Go Home</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -318,69 +314,66 @@ export default function WorkoutScreen() {
     <View style={styles.container}>
       <WorkoutHeader />
 
-      {/* Info Bar */}
-      <View style={styles.infoBar}>
-        <Text style={styles.infoText}>
-          Duration: {currentWorkout.duration} min •{' '}
-          {currentWorkout.exercises.length} exercises
-        </Text>
-      </View>
-
-      {/* Exercises */}
-      <ScrollView
-        style={styles.scrollView}
+      <Animated.ScrollView
+        style={[styles.scrollView, {opacity: fadeAnim}]}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}>
         {currentWorkout.exercises.map((exercise, index) => (
-          <ExerciseCard
+          <Animated.View
             key={`${exercise.id}-${index}`}
-            exercise={exercise}
-            exerciseIndex={index}
-            onUpdate={(setIndex, actual, weight, completed, restTime) =>
-              handleSetUpdate(
-                index,
-                setIndex,
-                actual,
-                weight,
-                completed,
-                restTime,
-              )
-            }
-            onReorderRequest={handleReorderRequest}
-            onReplaceRequest={handleReplaceRequest}
-            onRemoveExercise={handleRemoveExercise}
-          />
+            style={{
+              opacity: fadeAnim,
+              transform: [
+                {
+                  translateY: fadeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                },
+              ],
+            }}>
+            <ExerciseCard
+              exercise={exercise}
+              exerciseIndex={index}
+              onUpdate={(setIndex, actual, weight, completed, restTime) =>
+                handleSetUpdate(
+                  index,
+                  setIndex,
+                  actual,
+                  weight,
+                  completed,
+                  restTime,
+                )
+              }
+              onReorderRequest={handleReorderRequest}
+              onReplaceRequest={handleReplaceRequest}
+              onRemoveExercise={handleRemoveExercise}
+            />
+          </Animated.View>
         ))}
 
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={styles.discardButton}
-            onPress={handleDiscardWorkout}>
-            <Text style={styles.discardButtonText}>Discard Workout</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.completeButton}
-            onPress={() => {
-              Alert.alert(
-                'Complete Workout',
-                'Are you sure you want to finish this workout?',
-                [
-                  {text: 'Cancel', style: 'cancel'},
-                  {text: 'Complete', onPress: handleCompleteWorkout},
-                ],
-              );
-            }}>
-            <Text style={styles.completeButtonText}>Complete Workout</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+        {/* Complete Button */}
+        <TouchableOpacity
+          style={styles.completeButton}
+          onPress={() => {
+            Alert.alert(
+              'Complete Workout',
+              'Finish this workout and save your progress?',
+              [
+                {text: 'Cancel', style: 'cancel'},
+                {text: 'Complete', onPress: handleCompleteWorkout},
+              ],
+            );
+          }}
+          activeOpacity={0.8}>
+          <Text style={styles.completeButtonText}>Complete Workout</Text>
+        </TouchableOpacity>
+      </Animated.ScrollView>
 
       {/* Timer Modal */}
       <TimerModal
         visible={!!activeTimer}
-        onDismiss={handleTimerFinished}
+        onDismiss={() => setActiveTimer(null)}
         initialDuration={activeTimer?.restTime || 60}
         timerUpdated={timerUpdated}
         setTimerUpdated={setTimerUpdated}
@@ -397,20 +390,17 @@ export default function WorkoutScreen() {
       )}
 
       {/* Replace Modal */}
-      {showReplaceModal &&
-        exerciseToReplace !== null &&
-        currentWorkout &&
-        currentWorkout.exercises[exerciseToReplace] && (
-          <ReplaceExerciseModal
-            visible={showReplaceModal}
-            onClose={() => {
-              setShowReplaceModal(false);
-              setExerciseToReplace(null);
-            }}
-            onReplace={handleReplaceComplete}
-            currentExerciseId={currentWorkout.exercises[exerciseToReplace].id}
-          />
-        )}
+      {showReplaceModal && exerciseToReplace !== null && currentWorkout && (
+        <ReplaceExerciseModal
+          visible={showReplaceModal}
+          onClose={() => {
+            setShowReplaceModal(false);
+            setExerciseToReplace(null);
+          }}
+          onReplace={handleReplaceComplete}
+          currentExerciseId={currentWorkout.exercises[exerciseToReplace].id}
+        />
+      )}
     </View>
   );
 }
@@ -425,97 +415,68 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: spacing.lg,
   },
   loadingText: {
-    color: colors.textPrimary,
-    fontSize: 18,
-    marginTop: 20,
-    textAlign: 'center',
+    color: colors.textSecondary,
+    fontSize: typography.sizes.bodyLarge,
+    marginTop: spacing.lg,
   },
   errorContainer: {
     flex: 1,
-    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: spacing.xl,
   },
   errorTitle: {
     color: colors.textPrimary,
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    textAlign: 'center',
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.semibold,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
   },
   errorText: {
     color: colors.textSecondary,
-    fontSize: 16,
+    fontSize: typography.sizes.body,
     textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 22,
+    marginBottom: spacing.xl,
+    lineHeight: 24,
   },
   retryButton: {
-    backgroundColor: colors.secondary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: 12,
   },
   retryButtonText: {
     color: colors.buttonText,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  infoBar: {
-    backgroundColor: colors.cardBackground,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  infoText: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    textAlign: 'center',
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.semibold,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 40,
-  },
-  actionButtons: {
-    marginTop: 30,
-    gap: 12,
-  },
-  discardButton: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#FF3B30',
-  },
-  discardButtonText: {
-    color: '#FF3B30',
-    fontSize: 16,
-    fontWeight: 'bold',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xxl,
   },
   completeButton: {
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.success,
+    paddingVertical: spacing.md,
     borderRadius: 12,
-    paddingVertical: 16,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    marginTop: spacing.xl,
+    shadowColor: colors.success,
+    shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   completeButtonText: {
     color: colors.buttonText,
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: typography.sizes.bodyLarge,
+    fontWeight: typography.weights.semibold,
+    letterSpacing: typography.letterSpacing.wide,
   },
 });

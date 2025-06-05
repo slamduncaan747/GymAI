@@ -1,6 +1,6 @@
 // screens/HistoryScreen.tsx
 
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useRef} from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,10 @@ import {
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
+  Animated,
 } from 'react-native';
 import {useWorkout} from '../context/WorkoutContext';
-import {colors} from '../themes/colors';
+import {colors, typography, spacing} from '../themes';
 import {Workout} from '../types/workout';
 import Icon from 'react-native-vector-icons/Ionicons';
 
@@ -21,10 +22,26 @@ interface GroupedWorkouts {
 export default function HistoryScreen() {
   const {loadSavedWorkouts, savedWorkouts} = useWorkout();
   const [groupedWorkouts, setGroupedWorkouts] = useState<GroupedWorkouts>({});
-  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
     loadSavedWorkouts();
+
+    // Entry animation
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
 
   useEffect(() => {
@@ -48,17 +65,17 @@ export default function HistoryScreen() {
       year: 'numeric',
       month: 'long',
     });
-    setExpandedDates(new Set([currentMonth]));
+    setExpandedMonths(new Set([currentMonth]));
   }, [savedWorkouts]);
 
   const toggleMonthExpansion = (month: string) => {
-    const newExpanded = new Set(expandedDates);
+    const newExpanded = new Set(expandedMonths);
     if (newExpanded.has(month)) {
       newExpanded.delete(month);
     } else {
       newExpanded.add(month);
     }
-    setExpandedDates(newExpanded);
+    setExpandedMonths(newExpanded);
   };
 
   const getWorkoutStats = (workout: Workout) => {
@@ -91,13 +108,7 @@ export default function HistoryScreen() {
           <Text style={styles.screenTitle}>History</Text>
         </View>
         <View style={styles.emptyContainer}>
-          <View style={styles.emptyIconContainer}>
-            <Icon
-              name="calendar-outline"
-              size={64}
-              color={colors.textTertiary}
-            />
-          </View>
+          <Icon name="time-outline" size={64} color={colors.textTertiary} />
           <Text style={styles.emptyTitle}>No Workout History</Text>
           <Text style={styles.emptyText}>
             Your completed workouts will appear here
@@ -109,20 +120,26 @@ export default function HistoryScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <Animated.View
+        style={[
+          styles.header,
+          {
+            opacity: fadeAnim,
+            transform: [{translateY: slideAnim}],
+          },
+        ]}>
         <Text style={styles.screenTitle}>History</Text>
         <Text style={styles.screenSubtitle}>
-          {savedWorkouts.length} total workout
-          {savedWorkouts.length !== 1 ? 's' : ''}
+          {savedWorkouts.length} workouts completed
         </Text>
-      </View>
+      </Animated.View>
 
-      <ScrollView
-        style={styles.scrollView}
+      <Animated.ScrollView
+        style={[styles.scrollView, {opacity: fadeAnim}]}
         showsVerticalScrollIndicator={false}>
-        {months.map(month => {
+        {months.map((month, monthIndex) => {
           const workouts = groupedWorkouts[month];
-          const isExpanded = expandedDates.has(month);
+          const isExpanded = expandedMonths.has(month);
           const monthStats = workouts.reduce(
             (acc, workout) => {
               const stats = getWorkoutStats(workout);
@@ -135,11 +152,26 @@ export default function HistoryScreen() {
           );
 
           return (
-            <View key={month} style={styles.monthSection}>
+            <Animated.View
+              key={month}
+              style={[
+                styles.monthSection,
+                {
+                  opacity: fadeAnim,
+                  transform: [
+                    {
+                      translateY: fadeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [20, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}>
               <TouchableOpacity
                 style={styles.monthHeader}
                 onPress={() => toggleMonthExpansion(month)}
-                activeOpacity={0.7}>
+                activeOpacity={0.8}>
                 <View>
                   <Text style={styles.monthTitle}>{month}</Text>
                   <Text style={styles.monthStats}>
@@ -148,68 +180,51 @@ export default function HistoryScreen() {
                     {Math.round(monthStats.volume / 1000)}k lbs
                   </Text>
                 </View>
-                <Icon
-                  name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                  size={20}
-                  color={colors.textSecondary}
-                />
+                <Animated.View
+                  style={{
+                    transform: [
+                      {
+                        rotate: isExpanded ? '180deg' : '0deg',
+                      },
+                    ],
+                  }}>
+                  <Icon
+                    name="chevron-down"
+                    size={20}
+                    color={colors.textTertiary}
+                  />
+                </Animated.View>
               </TouchableOpacity>
 
               {isExpanded && (
                 <View style={styles.workoutsContainer}>
-                  {workouts.map(workout => {
+                  {workouts.map((workout, index) => {
                     const {totalSets, totalVolume} = getWorkoutStats(workout);
                     const workoutDate = new Date(workout.timestamp);
-                    const dayOfWeek = workoutDate.toLocaleDateString('en-US', {
-                      weekday: 'short',
-                    });
-                    const dayOfMonth = workoutDate.getDate();
-
-                    // Get primary muscle groups
-                    const muscleGroups = new Set<string>();
-                    workout.exercises.forEach(ex => {
-                      const exerciseName = ex.name.toLowerCase();
-                      if (
-                        exerciseName.includes('bench') ||
-                        exerciseName.includes('chest')
-                      ) {
-                        muscleGroups.add('Chest');
-                      } else if (
-                        exerciseName.includes('squat') ||
-                        exerciseName.includes('leg')
-                      ) {
-                        muscleGroups.add('Legs');
-                      } else if (
-                        exerciseName.includes('deadlift') ||
-                        exerciseName.includes('row') ||
-                        exerciseName.includes('back')
-                      ) {
-                        muscleGroups.add('Back');
-                      } else if (
-                        exerciseName.includes('shoulder') ||
-                        exerciseName.includes('press')
-                      ) {
-                        muscleGroups.add('Shoulders');
-                      } else if (
-                        exerciseName.includes('curl') ||
-                        exerciseName.includes('tricep')
-                      ) {
-                        muscleGroups.add('Arms');
-                      }
-                    });
+                    const isToday =
+                      new Date().toDateString() === workoutDate.toDateString();
 
                     return (
                       <TouchableOpacity
                         key={workout.id}
-                        style={styles.workoutCard}
-                        activeOpacity={0.7}>
-                        <View style={styles.workoutDateContainer}>
-                          <Text style={styles.workoutDay}>{dayOfWeek}</Text>
-                          <Text style={styles.workoutDate}>{dayOfMonth}</Text>
-                        </View>
+                        style={[
+                          styles.workoutCard,
+                          isToday && styles.workoutCardToday,
+                        ]}
+                        activeOpacity={0.8}>
+                        <View style={styles.workoutLeft}>
+                          <View style={styles.workoutDateContainer}>
+                            <Text style={styles.workoutWeekday}>
+                              {workoutDate.toLocaleDateString('en-US', {
+                                weekday: 'short',
+                              })}
+                            </Text>
+                            <Text style={styles.workoutDate}>
+                              {workoutDate.getDate()}
+                            </Text>
+                          </View>
 
-                        <View style={styles.workoutContent}>
-                          <View style={styles.workoutHeader}>
+                          <View style={styles.workoutContent}>
                             <Text style={styles.workoutTime}>
                               {workoutDate.toLocaleTimeString('en-US', {
                                 hour: 'numeric',
@@ -217,69 +232,37 @@ export default function HistoryScreen() {
                                 hour12: true,
                               })}
                             </Text>
-                            <Text style={styles.workoutDuration}>
-                              <Icon
-                                name="time-outline"
-                                size={14}
-                                color={colors.textSecondary}
-                              />{' '}
+                            <Text style={styles.workoutExercises}>
+                              {workout.exercises.length} exercises •{' '}
                               {workout.duration} min
                             </Text>
                           </View>
-
-                          <View style={styles.workoutMetrics}>
-                            <View style={styles.metricItem}>
-                              <Text style={styles.metricValue}>
-                                {workout.exercises.length}
-                              </Text>
-                              <Text style={styles.metricLabel}>Exercises</Text>
-                            </View>
-                            <View style={styles.metricDivider} />
-                            <View style={styles.metricItem}>
-                              <Text style={styles.metricValue}>
-                                {totalSets}
-                              </Text>
-                              <Text style={styles.metricLabel}>Sets</Text>
-                            </View>
-                            <View style={styles.metricDivider} />
-                            <View style={styles.metricItem}>
-                              <Text style={styles.metricValue}>
-                                {Math.round(totalVolume)}
-                              </Text>
-                              <Text style={styles.metricLabel}>Volume</Text>
-                            </View>
-                          </View>
-
-                          {muscleGroups.size > 0 && (
-                            <View style={styles.muscleGroupsContainer}>
-                              {Array.from(muscleGroups)
-                                .slice(0, 3)
-                                .map((muscle, idx) => (
-                                  <View key={idx} style={styles.muscleTag}>
-                                    <Text style={styles.muscleTagText}>
-                                      {muscle}
-                                    </Text>
-                                  </View>
-                                ))}
-                            </View>
-                          )}
                         </View>
 
-                        <Icon
-                          name="chevron-forward"
-                          size={20}
-                          color={colors.textTertiary}
-                          style={styles.workoutChevron}
-                        />
+                        <View style={styles.workoutRight}>
+                          <View style={styles.workoutStats}>
+                            <Text style={styles.workoutVolume}>
+                              {Math.round(totalVolume).toLocaleString()}
+                            </Text>
+                            <Text style={styles.workoutVolumeLabel}>lbs</Text>
+                          </View>
+                          <Icon
+                            name="chevron-forward"
+                            size={16}
+                            color={colors.textTertiary}
+                          />
+                        </View>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
               )}
-            </View>
+            </Animated.View>
           );
         })}
-      </ScrollView>
+
+        <View style={styles.bottomSpacer} />
+      </Animated.ScrollView>
     </SafeAreaView>
   );
 }
@@ -290,161 +273,132 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 24,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
   },
   screenTitle: {
-    fontSize: 32,
-    fontWeight: '700',
+    fontSize: typography.sizes.display,
+    fontWeight: typography.weights.bold,
     color: colors.textPrimary,
-    marginBottom: 4,
+    letterSpacing: typography.letterSpacing.tight,
   },
   screenSubtitle: {
-    fontSize: 17,
+    fontSize: typography.sizes.body,
     color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
   scrollView: {
     flex: 1,
   },
-  // Empty state
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyIconContainer: {
-    marginBottom: 24,
+    paddingHorizontal: spacing.xl,
   },
   emptyTitle: {
-    fontSize: 24,
-    fontWeight: '600',
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.semibold,
     color: colors.textPrimary,
-    marginBottom: 8,
-    textAlign: 'center',
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: typography.sizes.body,
     color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 24,
   },
-  // Month sections
   monthSection: {
-    marginBottom: 8,
+    marginBottom: spacing.xs,
   },
   monthHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: colors.cardBackground,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   monthTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: typography.sizes.bodyLarge,
+    fontWeight: typography.weights.semibold,
     color: colors.textPrimary,
-    marginBottom: 2,
+    marginBottom: spacing.xs,
   },
   monthStats: {
-    fontSize: 14,
+    fontSize: typography.sizes.caption,
     color: colors.textSecondary,
   },
-  // Workouts
   workoutsContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
   },
   workoutCard: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: colors.cardBackground,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 10,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  workoutCardToday: {
+    borderColor: colors.primary,
+  },
+  workoutLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   workoutDateContainer: {
     width: 48,
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: spacing.md,
   },
-  workoutDay: {
-    fontSize: 13,
+  workoutWeekday: {
+    fontSize: typography.sizes.caption,
     color: colors.textSecondary,
-    fontWeight: '500',
     marginBottom: 2,
   },
   workoutDate: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.secondary,
+    fontSize: typography.sizes.title,
+    fontWeight: typography.weights.semibold,
+    color: colors.textPrimary,
   },
   workoutContent: {
     flex: 1,
   },
-  workoutHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
   workoutTime: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginRight: 12,
-  },
-  workoutDuration: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  workoutMetrics: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  metricItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  metricValue: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.medium,
     color: colors.textPrimary,
     marginBottom: 2,
   },
-  metricLabel: {
-    fontSize: 12,
-    color: colors.textTertiary,
-    fontWeight: '500',
+  workoutExercises: {
+    fontSize: typography.sizes.caption,
+    color: colors.textSecondary,
   },
-  metricDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: colors.border,
-    marginHorizontal: 12,
-  },
-  muscleGroupsContainer: {
+  workoutRight: {
     flexDirection: 'row',
-    gap: 6,
+    alignItems: 'center',
+    gap: spacing.md,
   },
-  muscleTag: {
-    backgroundColor: colors.accentBackground,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+  workoutStats: {
+    alignItems: 'flex-end',
   },
-  muscleTagText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.secondary,
+  workoutVolume: {
+    fontSize: typography.sizes.bodyLarge,
+    fontWeight: typography.weights.semibold,
+    color: colors.textPrimary,
   },
-  workoutChevron: {
-    marginLeft: 8,
+  workoutVolumeLabel: {
+    fontSize: typography.sizes.caption,
+    color: colors.textSecondary,
+  },
+  bottomSpacer: {
+    height: spacing.xl,
   },
 });
