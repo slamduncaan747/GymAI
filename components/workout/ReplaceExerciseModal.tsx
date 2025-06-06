@@ -1,5 +1,3 @@
-// components/workout/ReplaceExerciseModal.tsx
-
 import React, {useState, useMemo, useEffect} from 'react';
 import {
   View,
@@ -14,7 +12,8 @@ import {
 } from 'react-native';
 import {WorkoutExercise, Exercise} from '../../types/workout';
 import {exerciseService} from '../../service/exerciseService';
-import {colors} from '../../themes/colors';
+import {colors, typography, spacing} from '../../themes';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 interface ReplaceExerciseModalProps {
   visible: boolean;
@@ -35,7 +34,6 @@ const ReplaceExerciseModal: React.FC<ReplaceExerciseModalProps> = ({
   >('all');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Reset state when modal opens
   useEffect(() => {
     if (visible) {
       setSearchQuery('');
@@ -44,24 +42,12 @@ const ReplaceExerciseModal: React.FC<ReplaceExerciseModalProps> = ({
     }
   }, [visible]);
 
-  // Get all exercises and filter
   const allExercises = useMemo(() => {
     try {
       const exercises = exerciseService.getAllExercises();
-      console.log(
-        'ReplaceExerciseModal - Total exercises from service:',
-        exercises.length,
-      );
-
-      // Make sure we have valid exercises
       if (!exercises || exercises.length === 0) {
-        console.error(
-          'No exercises returned from exerciseService.getAllExercises()',
-        );
         return [];
       }
-
-      // Filter out current exercise if we have an ID
       if (currentExerciseId) {
         return exercises.filter(ex => ex.id !== currentExerciseId);
       }
@@ -72,7 +58,6 @@ const ReplaceExerciseModal: React.FC<ReplaceExerciseModalProps> = ({
     }
   }, [currentExerciseId]);
 
-  // Get related exercises if we have a current exercise
   const relatedExercises = useMemo(() => {
     if (!currentExerciseId) return [];
     try {
@@ -83,16 +68,13 @@ const ReplaceExerciseModal: React.FC<ReplaceExerciseModalProps> = ({
     }
   }, [currentExerciseId]);
 
-  // Filter exercises based on search and category
   const filteredExercises = useMemo(() => {
     let exercises = allExercises;
 
-    // Apply category filter
     if (selectedCategory !== 'all') {
       exercises = exercises.filter(ex => ex.category === selectedCategory);
     }
 
-    // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       exercises = exercises.filter(
@@ -108,14 +90,11 @@ const ReplaceExerciseModal: React.FC<ReplaceExerciseModalProps> = ({
     return exercises;
   }, [searchQuery, selectedCategory, allExercises]);
 
-  // Determine which exercises to show
   const exercisesToShow = useMemo(() => {
-    // If searching or filtering by category, show filtered results
     if (searchQuery.trim() || selectedCategory !== 'all') {
       return filteredExercises;
     }
 
-    // Otherwise, show related exercises first if available
     if (relatedExercises.length > 0) {
       const relatedIds = new Set(relatedExercises.map(ex => ex.id));
       const otherExercises = filteredExercises.filter(
@@ -155,10 +134,16 @@ const ReplaceExerciseModal: React.FC<ReplaceExerciseModalProps> = ({
       activeOpacity={0.7}>
       <View style={styles.exerciseContent}>
         <Text style={styles.exerciseName}>{item.name}</Text>
-        <Text style={styles.exerciseDetails}>
-          {item.category.charAt(0).toUpperCase() + item.category.slice(1)} •{' '}
-          {item.equipment.replace('_', ' ')} • {item.difficulty}
-        </Text>
+        <View style={styles.exerciseTags}>
+          <View style={styles.tag}>
+            <Text style={styles.tagText}>
+              {item.equipment.replace('_', ' ')}
+            </Text>
+          </View>
+          <View style={styles.tag}>
+            <Text style={styles.tagText}>{item.difficulty}</Text>
+          </View>
+        </View>
         <Text style={styles.exerciseMuscles}>
           {item.muscleGroups.primary.map(mg => mg.replace('_', ' ')).join(', ')}
         </Text>
@@ -167,66 +152,9 @@ const ReplaceExerciseModal: React.FC<ReplaceExerciseModalProps> = ({
         <Text style={styles.statText}>
           {item.defaultSets} × {item.defaultReps}
         </Text>
+        <Icon name="chevron-forward" size={20} color={colors.textTertiary} />
       </View>
     </TouchableOpacity>
-  );
-
-  const renderHeader = () => (
-    <View>
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search exercises..."
-          placeholderTextColor={colors.textSecondary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-      </View>
-
-      {/* Category Filter */}
-      <View style={styles.categoryContainer}>
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={categories}
-          keyExtractor={item => `category-${item}`}
-          renderItem={({item}) => (
-            <TouchableOpacity
-              style={[
-                styles.categoryChip,
-                selectedCategory === item && styles.categoryChipActive,
-              ]}
-              onPress={() => setSelectedCategory(item)}
-              activeOpacity={0.7}>
-              <Text
-                style={[
-                  styles.categoryText,
-                  selectedCategory === item && styles.categoryTextActive,
-                ]}>
-                {item === 'all'
-                  ? 'All'
-                  : item === 'full_body'
-                  ? 'Full Body'
-                  : item.charAt(0).toUpperCase() + item.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          )}
-        />
-      </View>
-
-      {/* Related Exercises Section */}
-      {!searchQuery &&
-        selectedCategory === 'all' &&
-        relatedExercises.length > 0 &&
-        currentExerciseId && (
-          <View style={styles.relatedSection}>
-            <Text style={styles.sectionTitle}>Similar Exercises</Text>
-          </View>
-        )}
-    </View>
   );
 
   if (!visible) {
@@ -243,23 +171,24 @@ const ReplaceExerciseModal: React.FC<ReplaceExerciseModalProps> = ({
       <View style={styles.overlay}>
         <View style={styles.modalContainer}>
           <View style={styles.header}>
-            <Text style={styles.title}>
-              {currentExerciseId ? 'Replace Exercise' : 'Add Exercise'}
-            </Text>
             <TouchableOpacity
               style={styles.closeButton}
               onPress={onClose}
               activeOpacity={0.7}>
-              <Text style={styles.closeButtonText}>✕</Text>
+              <Icon name="close" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
+            <Text style={styles.title}>
+              {currentExerciseId ? 'Replace Exercise' : 'Add Exercise'}
+            </Text>
+            <View style={styles.placeholder} />
           </View>
 
-          {/* Move Search Bar Here */}
           <View style={styles.searchContainer}>
+            <Icon name="search" size={20} color={colors.textTertiary} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search exercises..."
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={colors.textTertiary}
               value={searchQuery}
               onChangeText={setSearchQuery}
               autoCapitalize="none"
@@ -269,7 +198,7 @@ const ReplaceExerciseModal: React.FC<ReplaceExerciseModalProps> = ({
 
           {isLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.secondary} />
+              <ActivityIndicator size="large" color={colors.primary} />
             </View>
           ) : (
             <FlatList
@@ -278,7 +207,6 @@ const ReplaceExerciseModal: React.FC<ReplaceExerciseModalProps> = ({
               keyExtractor={(item, index) => `exercise-${item.id}-${index}`}
               ListHeaderComponent={() => (
                 <View>
-                  {/* Category Filter */}
                   <View style={styles.categoryContainer}>
                     <FlatList
                       horizontal
@@ -311,7 +239,6 @@ const ReplaceExerciseModal: React.FC<ReplaceExerciseModalProps> = ({
                     />
                   </View>
 
-                  {/* Related Exercises Section */}
                   {!searchQuery &&
                     selectedCategory === 'all' &&
                     relatedExercises.length > 0 &&
@@ -333,6 +260,7 @@ const ReplaceExerciseModal: React.FC<ReplaceExerciseModalProps> = ({
               windowSize={10}
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
+                  <Icon name="search" size={48} color={colors.textTertiary} />
                   <Text style={styles.emptyText}>
                     {searchQuery
                       ? 'No exercises found matching your search'
@@ -342,13 +270,6 @@ const ReplaceExerciseModal: React.FC<ReplaceExerciseModalProps> = ({
               }
             />
           )}
-
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={onClose}
-            activeOpacity={0.7}>
-            <Text style={styles.cancelText}>Cancel</Text>
-          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -358,131 +279,137 @@ const ReplaceExerciseModal: React.FC<ReplaceExerciseModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'flex-end',
   },
   modalContainer: {
-    backgroundColor: colors.cardBackground,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     height: '90%',
-    paddingTop: 10,
+    paddingTop: spacing.sm,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: typography.sizes.headline,
+    fontWeight: typography.weights.semibold,
     color: colors.textPrimary,
   },
   closeButton: {
-    padding: 8,
+    padding: spacing.xs,
+    margin: -spacing.xs,
   },
-  closeButtonText: {
-    fontSize: 24,
-    color: colors.textSecondary,
-    fontWeight: 'bold',
+  placeholder: {
+    width: 32,
   },
   searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
   },
   searchInput: {
-    backgroundColor: colors.inputBackground,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
+    flex: 1,
+    paddingVertical: spacing.md,
+    fontSize: typography.sizes.body,
     color: colors.textPrimary,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
   },
   categoryContainer: {
-    paddingVertical: 12,
-    paddingLeft: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingVertical: spacing.sm,
+    paddingLeft: spacing.lg,
+    marginBottom: spacing.sm,
   },
   categoryChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     borderRadius: 20,
-    backgroundColor: colors.inputBackground,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
+    backgroundColor: colors.surface,
+    marginRight: spacing.sm,
   },
   categoryChipActive: {
-    backgroundColor: colors.secondary,
-    borderColor: colors.secondary,
+    backgroundColor: colors.primary,
   },
   categoryText: {
-    fontSize: 14,
+    fontSize: typography.sizes.body,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: typography.weights.medium,
   },
   categoryTextActive: {
     color: colors.buttonText,
   },
   relatedSection: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.secondary,
+    fontSize: typography.sizes.bodyLarge,
+    fontWeight: typography.weights.semibold,
+    color: colors.primary,
   },
   list: {
     flex: 1,
   },
   listContent: {
-    paddingBottom: 16,
+    paddingBottom: spacing.xl,
   },
   exerciseItem: {
     flexDirection: 'row',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    alignItems: 'center',
   },
   exerciseContent: {
     flex: 1,
   },
   exerciseName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: typography.sizes.bodyLarge,
+    fontWeight: typography.weights.medium,
     color: colors.textPrimary,
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
-  exerciseDetails: {
-    fontSize: 14,
+  exerciseTags: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  tag: {
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  tagText: {
+    fontSize: typography.sizes.caption,
     color: colors.textSecondary,
-    marginBottom: 2,
+    textTransform: 'capitalize',
   },
   exerciseMuscles: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    fontStyle: 'italic',
+    fontSize: typography.sizes.caption,
+    color: colors.textTertiary,
+    textTransform: 'capitalize',
   },
   exerciseStats: {
-    marginLeft: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   statText: {
-    fontSize: 14,
-    color: colors.secondary,
-    fontWeight: '600',
+    fontSize: typography.sizes.body,
+    color: colors.primary,
+    fontWeight: typography.weights.semibold,
   },
   loadingContainer: {
     height: 200,
@@ -490,25 +417,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyContainer: {
-    padding: 40,
+    padding: spacing.xxl,
     alignItems: 'center',
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: typography.sizes.body,
     color: colors.textSecondary,
     textAlign: 'center',
-  },
-  cancelButton: {
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.inputBackground,
-  },
-  cancelText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.secondary,
+    marginTop: spacing.md,
   },
 });
 

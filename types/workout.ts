@@ -48,6 +48,7 @@ export interface Exercise {
 }
 
 export interface WorkoutSet {
+  id?: string; // Add unique identifier
   target: number;
   actual: number;
   weight: number;

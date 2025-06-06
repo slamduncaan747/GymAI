@@ -35,11 +35,20 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
 
   const startWorkout = (duration: number, exercises: WorkoutExercise[]) => {
     console.log('Starting workout with', exercises.length, 'exercises');
+    // Add unique IDs to all sets
+    const exercisesWithSetIds = exercises.map(exercise => ({
+      ...exercise,
+      sets: exercise.sets.map((set, index) => ({
+        ...set,
+        id: `set_${Date.now()}_${exercise.id}_${index}_${Math.random()}`,
+      })),
+    }));
+
     const workout: Workout = {
       id: `workout_${Date.now()}`,
       timestamp: Date.now(),
       duration,
-      exercises: [...exercises], // Create a copy to avoid reference issues
+      exercises: exercisesWithSetIds,
       completed: false,
     };
     setCurrentWorkout(workout);
@@ -114,7 +123,10 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
           if (index === exerciseIndex) {
             return {
               ...exercise,
-              sets: [...exercise.sets, newSet],
+              sets: [
+                ...exercise.sets,
+                {...newSet, id: `set_${Date.now()}_${Math.random()}`},
+              ],
             };
           }
           return exercise;
@@ -148,21 +160,14 @@ export function WorkoutProvider({children}: {children: ReactNode}) {
         ...prevWorkout,
         exercises: prevWorkout.exercises.map((exercise, exIndex) => {
           if (exIndex === exerciseIndex) {
-            // Create new array with the set removed
+            // Simply filter out the set at the specified index
             const newSets = exercise.sets.filter(
               (_, sIndex) => sIndex !== setIndex,
             );
 
-            // Preserve target reps from deleted set if needed
-            const deletedSet = exercise.sets[setIndex];
-
             return {
               ...exercise,
-              sets: newSets.map((set, index) => ({
-                ...set,
-                // Optionally preserve target reps pattern
-                target: set.target || deletedSet.target || exercise.targetReps,
-              })),
+              sets: newSets,
             };
           }
           return exercise;

@@ -8,7 +8,8 @@ import {
   TouchableWithoutFeedback,
   Dimensions,
 } from 'react-native';
-import {colors} from '../../themes/colors';
+import {colors, typography, spacing} from '../../themes';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 interface ExerciseOptionsModalProps {
   visible: boolean;
@@ -29,7 +30,6 @@ const ExerciseOptionsModal: React.FC<ExerciseOptionsModalProps> = ({
 }) => {
   const handleOptionPress = (action: () => void) => {
     onClose();
-    // Add a small delay to let the modal close before executing the action
     setTimeout(action, 100);
   };
 
@@ -44,6 +44,8 @@ const ExerciseOptionsModal: React.FC<ExerciseOptionsModalProps> = ({
           <TouchableWithoutFeedback>
             <View style={styles.modalContainer}>
               <View style={styles.modalContent}>
+                <View style={styles.handle} />
+
                 <View style={styles.header}>
                   <Text style={styles.title} numberOfLines={2}>
                     {exerciseName}
@@ -55,39 +57,57 @@ const ExerciseOptionsModal: React.FC<ExerciseOptionsModalProps> = ({
                     style={styles.option}
                     onPress={() => handleOptionPress(onReorder)}
                     activeOpacity={0.7}>
-                    <Text style={styles.optionIcon}>↕️</Text>
+                    <View style={styles.optionIcon}>
+                      <Icon
+                        name="swap-vertical"
+                        size={20}
+                        color={colors.primary}
+                      />
+                    </View>
                     <Text style={styles.optionText}>Reorder Exercises</Text>
+                    <Icon
+                      name="chevron-forward"
+                      size={20}
+                      color={colors.textTertiary}
+                    />
                   </TouchableOpacity>
-
-                  <View style={styles.separator} />
 
                   <TouchableOpacity
                     style={styles.option}
                     onPress={() => handleOptionPress(onReplace)}
                     activeOpacity={0.7}>
-                    <Text style={styles.optionIcon}>🔄</Text>
+                    <View style={styles.optionIcon}>
+                      <Icon name="repeat" size={20} color={colors.primary} />
+                    </View>
                     <Text style={styles.optionText}>Replace Exercise</Text>
+                    <Icon
+                      name="chevron-forward"
+                      size={20}
+                      color={colors.textTertiary}
+                    />
                   </TouchableOpacity>
-
-                  <View style={styles.separator} />
 
                   <TouchableOpacity
                     style={[styles.option, styles.dangerOption]}
                     onPress={() => handleOptionPress(onRemove)}
                     activeOpacity={0.7}>
-                    <Text style={styles.optionIcon}>🗑️</Text>
+                    <View style={[styles.optionIcon, styles.dangerIcon]}>
+                      <Icon
+                        name="trash-outline"
+                        size={20}
+                        color={colors.danger}
+                      />
+                    </View>
                     <Text style={[styles.optionText, styles.dangerText]}>
                       Remove Exercise
                     </Text>
+                    <Icon
+                      name="chevron-forward"
+                      size={20}
+                      color={colors.danger}
+                    />
                   </TouchableOpacity>
                 </View>
-
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={onClose}
-                  activeOpacity={0.7}>
-                  <Text style={styles.cancelText}>Cancel</Text>
-                </TouchableOpacity>
               </View>
             </View>
           </TouchableWithoutFeedback>
@@ -100,77 +120,67 @@ const ExerciseOptionsModal: React.FC<ExerciseOptionsModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'flex-end',
   },
   modalContainer: {
-    paddingHorizontal: 10,
-    paddingBottom: 34,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xl,
   },
   modalContent: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: -4},
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 8,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    backgroundColor: colors.textTertiary,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: spacing.sm,
+    opacity: 0.5,
   },
   header: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    padding: spacing.lg,
     alignItems: 'center',
   },
   title: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: typography.sizes.bodyLarge,
+    fontWeight: typography.weights.semibold,
     color: colors.textPrimary,
     textAlign: 'center',
   },
   optionsContainer: {
-    paddingVertical: 8,
+    paddingBottom: spacing.sm,
   },
   option: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
-  dangerOption: {
-    backgroundColor: 'rgba(255, 59, 48, 0.1)',
-  },
+  dangerOption: {},
   optionIcon: {
-    fontSize: 20,
-    marginRight: 12,
-    width: 28,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.primaryDim,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  dangerIcon: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
   },
   optionText: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.medium,
     color: colors.textPrimary,
     flex: 1,
   },
   dangerText: {
-    color: '#FF3B30',
-  },
-  separator: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginHorizontal: 20,
-  },
-  cancelButton: {
-    padding: 16,
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.inputBackground,
-  },
-  cancelText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.accent,
+    color: colors.danger,
   },
 });
 

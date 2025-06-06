@@ -159,7 +159,11 @@ export default function App() {
             name="WorkoutPreview"
             component={WorkoutPreviewScreen}
           />
-          <Stack.Screen name="Workout" component={WorkoutScreen} />
+          <Stack.Screen
+            name="Workout"
+            component={WorkoutScreen}
+            options={{gestureEnabled: false}}
+          />
           <Stack.Screen
             name="WorkoutSummary"
             component={WorkoutSummaryScreen}

@@ -1,5 +1,5 @@
 export const OPENAI_API_KEY =
-  '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';
+  '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';
 
 // API endpoints
 export const API_ENDPOINTS = {

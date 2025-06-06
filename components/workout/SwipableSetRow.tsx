@@ -30,69 +30,79 @@ const SwipeableSetRow: React.FC<SwipeableSetRowProps> = ({
   restTime,
   canDelete = true,
 }) => {
-  const [isRevealed, setIsRevealed] = useState(false);
   const translateX = useRef(new Animated.Value(0)).current;
   const DELETE_BUTTON_WIDTH = 80;
 
-  const panResponder = PanResponder.create({
-    onMoveShouldSetPanResponder: (evt, gestureState) => {
-      return (
-        Math.abs(gestureState.dx) > Math.abs(gestureState.dy) &&
-        Math.abs(gestureState.dx) > 10
-      );
-    },
-    onPanResponderGrant: () => {
-      // @ts-ignore - _value is a private property but we need it
-      translateX.setOffset(translateX._value);
-    },
-    onPanResponderMove: (evt, gestureState) => {
-      if (canDelete) {
-        // Only allow left swipe (negative values)
-        const newValue = Math.min(0, gestureState.dx);
-        translateX.setValue(newValue);
-      }
-    },
-    onPanResponderRelease: (evt, gestureState) => {
-      translateX.flattenOffset();
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        return (
+          canDelete &&
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) &&
+          Math.abs(gestureState.dx) > 10
+        );
+      },
+      onPanResponderGrant: () => {
+        translateX.setOffset(translateX._value);
+        translateX.setValue(0);
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        if (canDelete) {
+          // Only allow left swipe (negative values) up to button width
+          const newValue = Math.max(
+            -DELETE_BUTTON_WIDTH,
+            Math.min(0, gestureState.dx),
+          );
+          translateX.setValue(newValue);
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        translateX.flattenOffset();
 
-      if (gestureState.dx < -DELETE_BUTTON_WIDTH / 2 && canDelete) {
-        // Reveal delete button
-        setIsRevealed(true);
-        Animated.spring(translateX, {
-          toValue: -DELETE_BUTTON_WIDTH,
-          useNativeDriver: false,
-        }).start();
-      } else {
-        // Hide delete button
-        setIsRevealed(false);
-        Animated.spring(translateX, {
-          toValue: 0,
-          useNativeDriver: false,
-        }).start();
-      }
-    },
-  });
+        if (gestureState.dx < -DELETE_BUTTON_WIDTH / 2 && canDelete) {
+          // Reveal delete button
+          Animated.spring(translateX, {
+            toValue: -DELETE_BUTTON_WIDTH,
+            useNativeDriver: true,
+            tension: 100,
+            friction: 10,
+          }).start();
+        } else {
+          // Hide delete button
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 100,
+            friction: 10,
+          }).start();
+        }
+      },
+    }),
+  ).current;
 
   const handleDelete = () => {
-    Animated.spring(translateX, {
-      toValue: -300, // Slide completely off screen
-      useNativeDriver: false,
+    // Quick slide out animation
+    Animated.timing(translateX, {
+      toValue: -400,
+      duration: 200,
+      useNativeDriver: true,
     }).start(() => {
       onDelete();
     });
   };
 
   const hideDeleteButton = () => {
-    setIsRevealed(false);
     Animated.spring(translateX, {
       toValue: 0,
-      useNativeDriver: false,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 10,
     }).start();
   };
 
   return (
     <View style={styles.container}>
-      {/* Delete button background */}
+      {/* Delete button - positioned absolutely */}
       <View style={styles.deleteButtonContainer}>
         <TouchableOpacity
           style={styles.deleteButton}
@@ -106,12 +116,14 @@ const SwipeableSetRow: React.FC<SwipeableSetRowProps> = ({
       <Animated.View
         style={[
           styles.swipeableContent,
-          {transform: [{translateX: translateX}]},
+          {
+            transform: [{translateX: translateX}],
+          },
         ]}
         {...panResponder.panHandlers}>
         <TouchableOpacity
           activeOpacity={1}
-          onPress={isRevealed ? hideDeleteButton : undefined}
+          onPress={hideDeleteButton}
           style={styles.setRowContainer}>
           <SetInputRow
             setNumber={setNumber}
@@ -129,7 +141,8 @@ const SwipeableSetRow: React.FC<SwipeableSetRowProps> = ({
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
-    overflow: 'hidden',
+    marginBottom: 2,
+    backgroundColor: colors.background,
   },
   deleteButtonContainer: {
     position: 'absolute',
@@ -139,13 +152,12 @@ const styles = StyleSheet.create({
     width: 80,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
   },
   deleteButton: {
     backgroundColor: '#FF3B30',
     justifyContent: 'center',
     alignItems: 'center',
-    height: '80%',
+    height: '90%',
     width: 70,
     borderRadius: 8,
   },
@@ -155,7 +167,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   swipeableContent: {
-    backgroundColor: colors.setRowBackground,
+    backgroundColor: colors.surface,
+    position: 'relative',
+    zIndex: 1,
   },
   setRowContainer: {
     flex: 1,

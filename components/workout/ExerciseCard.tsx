@@ -160,10 +160,9 @@ const ExerciseCard: React.FC<ExerciseCardProps> = React.memo(
             <Text style={styles.headerText}>REPS</Text>
             <View style={{width: 40}} />
           </View>
-
           {exercise.sets.map((set, index) => (
             <SwipeableSetRow
-              key={index}
+              key={set.id || `${exercise.id}-set-${index}`}
               setNumber={index + 1}
               set={set}
               onUpdate={(actual, weight, completed) =>
